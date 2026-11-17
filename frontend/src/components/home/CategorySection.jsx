@@ -1,82 +1,113 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { productAPI } from "../../services/productService";
-import { 
-  FiDroplet, FiSun, FiFeather, FiStar, FiHeart
+import {
+  FiDroplet,
+  FiFeather,
+  FiSun,
+  FiHeart,
+  FiStar,
 } from "react-icons/fi";
 import { GiLipstick, GiFlowerPot } from "react-icons/gi";
+import { productAPI } from "../../services/productService";
 
-// ✅ Icons ka size badhaya (32) aur strokeWidth (2) se bold kiya
 const getCategoryIcon = (name) => {
-  const n = name.toLowerCase();
-  if (n.includes("skin")) return <FiDroplet size={32} strokeWidth={2} />;
-  if (n.includes("makeup") || n.includes("lip")) return <GiLipstick size={32} />;
-  if (n.includes("body")) return <FiFeather size={32} strokeWidth={2} />;
-  if (n.includes("hair")) return <FiSun size={32} strokeWidth={2} />;
-  if (n.includes("fragrance") || n.includes("perfume")) return <GiFlowerPot size={32} />;
-  if (n.includes("care")) return <FiHeart size={32} strokeWidth={2} />;
-  return <FiStar size={32} strokeWidth={2} />; 
+  const value = name?.toLowerCase() || "";
+
+  if (value.includes("skin")) return FiDroplet;
+  if (value.includes("makeup") || value.includes("lip")) return GiLipstick;
+  if (value.includes("body")) return FiFeather;
+  if (value.includes("hair")) return FiSun;
+
+  if (value.includes("fragrance") || value.includes("perfume")) {
+    return GiFlowerPot;
+  }
+
+  if (value.includes("care")) return FiHeart;
+
+  return FiStar;
 };
 
 const CategorySection = () => {
   const [categories, setCategories] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true;
-    productAPI
-      .getCategories()
-      .then((res) => active && setCategories(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
-      .finally(() => active && setLoaded(true));
-    return () => {
-      active = false;
+    const fetchCategories = async () => {
+      try {
+        const res = await productAPI.getCategories();
+
+        const data = Array.isArray(res.data)
+          ? res.data
+          : res.data?.categories || [];
+
+        setCategories(data);
+      } catch (error) {
+        console.error("Category fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchCategories();
   }, []);
 
-  if (loaded && categories.length === 0) return null;
+  if (!loading && categories.length === 0) return null;
 
   return (
-    <section className="w-full bg-[#faf7f2] py-6 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        
-        <div 
-          className="flex items-start gap-6 md:gap-10 overflow-x-auto pb-2"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} 
-        >
-          <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
-          
-          <div className="flex items-start gap-6 md:gap-10 hide-scrollbar">
-            {!loaded &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex flex-col items-center gap-3 shrink-0 w-20">
-                  <div className="w-[72px] h-[72px] md:w-24 md:h-24 rounded-full bg-ink/5 animate-pulse" />
-                  <div className="w-12 h-3 bg-ink/5 rounded animate-pulse" />
-                </div>
-              ))}
+    <section className="bg-[#faf7f2] pt-1 pb-2">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-            {categories.map((c) => (
-              <Link
-                key={c._id}
-                to={`/products?category=${c._id}`}
-                className="flex flex-col items-center gap-3 shrink-0 group focus-visible:outline-none"
-              >
-                {/* Circle ki size same hai (w-[72px] h-[72px] md:w-24 md:h-24) */}
-                <div className="w-[72px] h-[72px] md:w-24 md:h-24 rounded-full bg-[#ede3d5] flex items-center justify-center text-[#4A6B4A] 
-                                shadow-[inset_0_-3px_6px_rgba(0,0,0,0.04)] transition-all duration-300 
-                                group-hover:bg-[#e3d5c3] group-hover:shadow-[inset_0_-3px_6px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.05)] 
-                                group-hover:-translate-y-1">
-                  {getCategoryIcon(c.name)}
-                </div>
-                
-                <span className="text-[13px] md:text-sm font-semibold text-ink/75 group-hover:text-ink transition-colors">
-                  {c.name}
-                </span>
-              </Link>
-            ))}
-          </div>
+        {/* Heading */}
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-serif text-xl font-semibold text-[#33251D] md:text-2xl">
+            Shop by Category.
+          </h2>
+
+          <Link
+            to="/categories"
+            className="text-xs font-semibold text-[#79624F] transition hover:text-black"
+          >
+            View All →
+          </Link>
         </div>
 
+        {/* Categories */}
+        <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6">
+          {loading
+            ? Array.from({ length: 5 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex min-w-[65px] shrink-0 animate-pulse flex-col items-center gap-1.5"
+                >
+                  <div className="h-[60px] w-[60px] rounded-full bg-[#ede3d5] sm:h-[76px] sm:w-[76px]" />
+                  <div className="h-3 w-14 rounded bg-[#ede3d5]" />
+                </div>
+              ))
+            : categories.map((category, index) => {
+                const name =
+                  category.name ||
+                  category.categoryName ||
+                  category.title;
+
+                const Icon = getCategoryIcon(name);
+
+                return (
+                  <Link
+                    key={category._id || index}
+                    to={`/products?category=${encodeURIComponent(name)}`}
+                    className="group flex min-w-[65px] shrink-0 flex-col items-center gap-1"
+                  >
+                    <div className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#ede3d5] transition duration-300 group-hover:scale-105 group-hover:bg-[#e3d3c0] sm:h-[76px] sm:w-[76px]">
+                      <Icon className="text-[25px] text-[#4A6B4A] sm:text-[29px]" />
+                    </div>
+
+                    <span className="max-w-[85px] truncate text-center text-[11px] font-medium text-[#33251D] sm:text-xs">
+                      {name}
+                    </span>
+                  </Link>
+                );
+              })}
+        </div>
       </div>
     </section>
   );

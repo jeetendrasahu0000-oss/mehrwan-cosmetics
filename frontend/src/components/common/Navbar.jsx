@@ -335,7 +335,7 @@ const Navbar = () => {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed bottom-0 left-0 right-0 z-[70] flex w-full flex-col bg-[#c7b99b] px-6 pt-4 pb-8 rounded-t-3xl shadow-2xl lg:hidden max-h-[85vh] overflow-y-auto"
+                className="fixed bottom-0 left-0 right-0 z-[70] flex w-full flex-col bg-[#f5efe6] px-6 pt-4 pb-8 rounded-t-3xl shadow-2xl lg:hidden max-h-[85vh] overflow-y-auto"
               >
                 <div className="w-12 h-1.5 bg-black/10 rounded-full mx-auto mb-6" />
 
