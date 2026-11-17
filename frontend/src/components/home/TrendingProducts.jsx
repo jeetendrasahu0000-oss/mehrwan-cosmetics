@@ -1,51 +1,247 @@
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { FiArrowRight, FiLoader } from "react-icons/fi";
+
 import { productAPI } from "../../services/productService";
 import ProductCard from "../common/ProductCard";
 
+const PAGE_SIZE = 6;
+
+// Skeleton Card
 const SkeletonCard = () => (
-  <div className="animate-pulse" aria-hidden="true">
+  <div className="w-[42%] shrink-0 animate-pulse sm:w-[30%] lg:w-[calc(20%-16px)]">
     <div className="aspect-[4/5] rounded-xl bg-ink/5" />
     <div className="mt-3 h-3 w-3/4 rounded bg-ink/5" />
     <div className="mt-2 h-3 w-1/3 rounded bg-ink/5" />
   </div>
 );
 
+// Throttle
+const throttle = (callback, delay) => {
+  let lastCall = 0;
+
+  return (...args) => {
+    const now = Date.now();
+
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      callback(...args);
+    }
+  };
+};
+
+// Debounce
+const debounce = (callback, delay) => {
+  let timer;
+
+  const debounced = (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => callback(...args), delay);
+  };
+
+  debounced.cancel = () => clearTimeout(timer);
+
+  return debounced;
+};
+
 const TrendingProducts = () => {
   const [products, setProducts] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    productAPI
-      .getAll({ sort: "rating", limit: 4 })
-      .then((res) => {
-        if (active) setProducts(res.data?.products || []);
-      })
-      .catch(() => {})
-      .finally(() => active && setLoaded(true));
-    return () => {
-      active = false;
-    };
+  const carouselRef = useRef(null);
+  const pageRef = useRef(1);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+
+  // Fetch Trending Products
+  const fetchProducts = useCallback(async (page = 1) => {
+    if (loadingRef.current || !hasMoreRef.current) return;
+
+    loadingRef.current = true;
+
+    if (page === 1) {
+      setInitialLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const res = await productAPI.getAll({
+        sort: "rating",
+        page,
+        limit: PAGE_SIZE,
+      });
+
+      const newProducts = res.data?.products || [];
+
+      setProducts((prev) => {
+        if (page === 1) return newProducts;
+
+        const existingIds = new Set(
+          prev.map((product) => product._id)
+        );
+
+        const uniqueProducts = newProducts.filter(
+          (product) => !existingIds.has(product._id)
+        );
+
+        return [...prev, ...uniqueProducts];
+      });
+
+      pageRef.current = page;
+
+      const pagination = res.data?.pagination;
+
+      const moreAvailable = pagination
+        ? pagination.hasNextPage ??
+          (pagination.totalPages != null
+            ? page < pagination.totalPages
+            : newProducts.length === PAGE_SIZE)
+        : newProducts.length === PAGE_SIZE;
+
+      hasMoreRef.current = moreAvailable;
+      setHasMore(moreAvailable);
+    } catch (error) {
+      console.error("Trending products loading failed:", error);
+    } finally {
+      loadingRef.current = false;
+      setInitialLoading(false);
+      setLoadingMore(false);
+    }
   }, []);
 
-  // Load ho gaya aur koi product nahi: section chhupa do
-  if (loaded && products.length === 0) return null;
+  // Initial Loading
+  useEffect(() => {
+    fetchProducts(1);
+  }, [fetchProducts]);
+
+  // Horizontal Infinite Scroll
+  const checkHorizontalScroll = useCallback(() => {
+    const slider = carouselRef.current;
+
+    if (!slider || loadingRef.current || !hasMoreRef.current) return;
+
+    const remaining =
+      slider.scrollWidth - slider.scrollLeft - slider.clientWidth;
+
+    if (remaining < 350) {
+      fetchProducts(pageRef.current + 1);
+    }
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    const slider = carouselRef.current;
+
+    if (!slider) return;
+
+    const debouncedCheck = debounce(checkHorizontalScroll, 120);
+
+    const throttledCheck = throttle(() => {
+      checkHorizontalScroll();
+      debouncedCheck();
+    }, 200);
+
+    slider.addEventListener("scroll", throttledCheck, {
+      passive: true,
+    });
+
+    return () => {
+      slider.removeEventListener("scroll", throttledCheck);
+      debouncedCheck.cancel();
+    };
+  }, [checkHorizontalScroll]);
+
+  // Mouse Wheel Horizontal Scrolling
+  const handleWheel = (event) => {
+    const slider = carouselRef.current;
+
+    if (!slider) return;
+
+    if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+      slider.scrollLeft += event.deltaY;
+    }
+  };
+
+  // Hide if no products
+  if (!initialLoading && products.length === 0) {
+    return null;
+  }
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-14">
-      <div className="mb-5 text-center md:mb-7">
-        <h2 className="font-serif text-2xl font-semibold leading-tight text-ink md:text-3xl">
-          Trending now
-        </h2>
-        <p className="mt-1 text-sm text-ink/60">Top-rated picks on everyone's list.</p>
-      </div>
+    <section className="relative overflow-hidden py-10 md:py-12">
+      <div className="mx-auto max-w-7xl px-4 md:px-8">
 
-      <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-4">
-        {!loaded && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+        {/* Compact Heading */}
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <span className="mb-1 block text-[9px] font-semibold uppercase tracking-[0.25em] text-blush-600">
+              Customer favourites
+            </span>
 
-        {products.map((p, i) => (
-          <ProductCard key={p._id} product={p} index={i} />
-        ))}
+            <h2 className="font-serif text-2xl font-semibold text-ink md:text-3xl">
+              Trending Now
+              <span className="text-blush-500">.</span>
+            </h2>
+          </div>
+
+          <Link
+            to="/products?sort=rating"
+            className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-ink/10 px-4 py-2 text-xs font-semibold text-ink/70 transition-all duration-300 hover:border-blush-500 hover:bg-blush-500 hover:text-white"
+          >
+            View All
+            <FiArrowRight className="transition-transform group-hover:translate-x-1" />
+          </Link>
+        </div>
+
+        {/* Horizontal Carousel */}
+        <div
+          ref={carouselRef}
+          onWheel={handleWheel}
+          className="flex cursor-grab gap-3 overflow-x-auto scroll-smooth pb-4 active:cursor-grabbing snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-4"
+        >
+          {/* Initial Skeleton */}
+          {initialLoading &&
+            Array.from({ length: PAGE_SIZE }).map((_, index) => (
+              <SkeletonCard key={`initial-${index}`} />
+            ))}
+
+          {/* Products */}
+          {products.map((product, index) => (
+            <div
+              key={product._id}
+              className="w-[42%] shrink-0 snap-start animate-[fadeUp_500ms_ease_both] sm:w-[30%] lg:w-[calc(20%-16px)]"
+              style={{
+                animationDelay: `${(index % PAGE_SIZE) * 150}ms`,
+              }}
+            >
+              <ProductCard product={product} index={index} />
+            </div>
+          ))}
+
+          {/* Loading More Skeleton */}
+          {loadingMore &&
+            Array.from({ length: PAGE_SIZE }).map((_, index) => (
+              <SkeletonCard key={`loading-${index}`} />
+            ))}
+        </div>
+
+        {/* Loading Indicator */}
+        {loadingMore && (
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-ink/60">
+            <FiLoader className="animate-spin text-blush-500" />
+            Loading more trending products...
+          </div>
+        )}
+
+        {/* End Message */}
+        {!hasMore && products.length > 0 && (
+          <p className="mt-6 text-center font-serif text-xs text-ink/50">
+            You've seen all trending products.
+          </p>
+        )}
       </div>
     </section>
   );

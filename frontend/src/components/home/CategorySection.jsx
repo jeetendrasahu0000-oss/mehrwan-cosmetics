@@ -1,17 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FiArrowRight } from "react-icons/fi";
 import { productAPI } from "../../services/productService";
+import { 
+  FiDroplet, FiSun, FiFeather, FiStar, FiHeart
+} from "react-icons/fi";
+import { GiLipstick, GiFlowerPot } from "react-icons/gi";
 
-// Agar database me image na ho to ye fallback images
-const FALLBACK_IMAGES = [
-  "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=800&q=80", // Skincare
-  "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&q=80", // Makeup
-  "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=800&q=80", // Body care
-  "https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800&q=80", // Fragrances
-];
-
-const CARD_RATIO = "aspect-[4/5]";
+// ✅ Icons ka size badhaya (32) aur strokeWidth (2) se bold kiya
+const getCategoryIcon = (name) => {
+  const n = name.toLowerCase();
+  if (n.includes("skin")) return <FiDroplet size={32} strokeWidth={2} />;
+  if (n.includes("makeup") || n.includes("lip")) return <GiLipstick size={32} />;
+  if (n.includes("body")) return <FiFeather size={32} strokeWidth={2} />;
+  if (n.includes("hair")) return <FiSun size={32} strokeWidth={2} />;
+  if (n.includes("fragrance") || n.includes("perfume")) return <GiFlowerPot size={32} />;
+  if (n.includes("care")) return <FiHeart size={32} strokeWidth={2} />;
+  return <FiStar size={32} strokeWidth={2} />; 
+};
 
 const CategorySection = () => {
   const [categories, setCategories] = useState([]);
@@ -21,9 +26,7 @@ const CategorySection = () => {
     let active = true;
     productAPI
       .getCategories()
-      .then((res) => {
-        if (active) setCategories(Array.isArray(res.data) ? res.data.slice(0, 4) : []);
-      })
+      .then((res) => active && setCategories(Array.isArray(res.data) ? res.data : []))
       .catch(() => {})
       .finally(() => active && setLoaded(true));
     return () => {
@@ -31,73 +34,49 @@ const CategorySection = () => {
     };
   }, []);
 
-  // Load ho gaya aur koi category nahi: poora section chhupa do
   if (loaded && categories.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-10 md:px-8 md:py-14">
-      <div className="mb-5 flex items-end justify-between gap-4 md:mb-7">
-        <div>
-          <h2 className="font-serif text-2xl font-semibold leading-tight text-ink md:text-3xl">
-            Shop by category
-          </h2>
-          <p className="mt-1 text-sm text-ink/60">Find what suits your routine.</p>
-        </div>
-        <Link
-          to="/products"
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-ink/70 transition-colors hover:text-blush-600"
+    <section className="w-full bg-[#faf7f2] py-6 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+        
+        <div 
+          className="flex items-start gap-6 md:gap-10 overflow-x-auto pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} 
         >
-          View all <FiArrowRight aria-hidden="true" />
-        </Link>
-      </div>
+          <style>{`.hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
+          
+          <div className="flex items-start gap-6 md:gap-10 hide-scrollbar">
+            {!loaded &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-3 shrink-0 w-20">
+                  <div className="w-[72px] h-[72px] md:w-24 md:h-24 rounded-full bg-ink/5 animate-pulse" />
+                  <div className="w-12 h-3 bg-ink/5 rounded animate-pulse" />
+                </div>
+              ))}
 
-      <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-4">
-        {/* Loading skeleton: same size, layout jump nahi hota */}
-        {!loaded &&
-          Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className={`${CARD_RATIO} animate-pulse rounded-xl bg-ink/5`}
-              aria-hidden="true"
-            />
-          ))}
-
-        {categories.map((c, i) => {
-          const fallback = FALLBACK_IMAGES[i % FALLBACK_IMAGES.length];
-          return (
-            <Link
-              key={c._id}
-              to={`/products?category=${c._id}`}
-              className={`group relative block ${CARD_RATIO} overflow-hidden rounded-xl bg-ink/5
-                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/40 focus-visible:ring-offset-2`}
-            >
-              <img
-                src={c.image || fallback}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                onError={(e) => {
-                  if (e.currentTarget.src !== fallback) e.currentTarget.src = fallback;
-                }}
-                className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
-
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-3 md:p-4">
-                <h3 className="truncate font-serif text-base font-semibold text-cream md:text-lg">
+            {categories.map((c) => (
+              <Link
+                key={c._id}
+                to={`/products?category=${c._id}`}
+                className="flex flex-col items-center gap-3 shrink-0 group focus-visible:outline-none"
+              >
+                {/* Circle ki size same hai (w-[72px] h-[72px] md:w-24 md:h-24) */}
+                <div className="w-[72px] h-[72px] md:w-24 md:h-24 rounded-full bg-[#ede3d5] flex items-center justify-center text-[#4A6B4A] 
+                                shadow-[inset_0_-3px_6px_rgba(0,0,0,0.04)] transition-all duration-300 
+                                group-hover:bg-[#e3d5c3] group-hover:shadow-[inset_0_-3px_6px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.05)] 
+                                group-hover:-translate-y-1">
+                  {getCategoryIcon(c.name)}
+                </div>
+                
+                <span className="text-[13px] md:text-sm font-semibold text-ink/75 group-hover:text-ink transition-colors">
                   {c.name}
-                </h3>
-                <span
-                  aria-hidden="true"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cream/90 text-sm text-ink
-                             motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
-                >
-                  <FiArrowRight />
                 </span>
-              </div>
-            </Link>
-          );
-        })}
+              </Link>
+            ))}
+          </div>
+        </div>
+
       </div>
     </section>
   );

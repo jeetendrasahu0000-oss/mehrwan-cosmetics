@@ -2,23 +2,16 @@ import { Link } from "react-router-dom";
 
 const Logo = ({ size = "md", to = "/" }) => {
   const sizes = {
-    
-    sm: { text: "text-xl", img: "w-10 h-10" },
-    md: { text: "text-2xl md:text-[26px]", img: "w-12 h-12" },
-    lg: { text: "text-4xl", img: "w-16 h-16" },
+    sm: { text: "text-lg md:text-xl" },
+    md: { text: "text-xl md:text-[24px]" },
+    lg: { text: "text-3xl md:text-4xl" },
   }[size];
 
   return (
-    <Link to={to} className="flex items-center gap-3 group select-none">
-     
-      <img
-        src="/favicon.png" 
-        alt="Mehrwan Logo"
-        className={`${sizes.img} object-contain shrink-0 transition-transform duration-300 group-hover:scale-105`}
-      />
-      
+    <Link to={to} className="flex items-center group select-none">
       <span
-        className={`${sizes.text} font-serif font-semibold tracking-[0.18em] uppercase text-ink`}
+        // ✅ font-semibold wapas laga diya hai
+        className={`${sizes.text} font-serif font-semibold tracking-[0.15em] md:tracking-[0.18em] uppercase text-ink`}
       >
         Mehrwan
       </span>
