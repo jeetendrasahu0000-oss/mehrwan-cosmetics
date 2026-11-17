@@ -59,10 +59,9 @@ const CategorySection = () => {
 
         {/* Heading */}
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-serif text-xl font-semibold text-[#33251D] md:text-2xl">
-            Shop by Category.
-          </h2>
-
+          <h2 className="my-[10px] font-serif text-xl font-semibold text-[#33251D] md:text-2xl">
+  Shop by Category.
+</h2>
           <Link
             to="/categories"
             className="text-xs font-semibold text-[#79624F] transition hover:text-black"

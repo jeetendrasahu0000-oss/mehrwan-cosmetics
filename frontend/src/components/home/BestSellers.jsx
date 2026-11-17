@@ -119,9 +119,7 @@ const BestSellers = () => {
         {/* Heading */}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-[0.2em] text-blush-600">
-              Curated for you
-            </span>
+           
 
             <h2 className="font-serif text-xl font-semibold text-ink md:text-2xl">
               Best Sellers
