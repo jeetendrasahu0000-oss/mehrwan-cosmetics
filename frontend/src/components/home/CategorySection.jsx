@@ -63,7 +63,7 @@ const CategorySection = () => {
   Shop by Category.
 </h2>
           <Link
-            to="/categories"
+            to="/products"
             className="text-xs font-semibold text-[#79624F] transition hover:text-black"
           >
             View All →
