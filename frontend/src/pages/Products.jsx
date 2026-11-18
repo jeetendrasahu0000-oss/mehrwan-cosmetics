@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { FiChevronDown, FiShoppingBag } from "react-icons/fi";
+
 import { fetchProducts } from "../redux/slices/productSlice";
 import ProductCard from "../components/common/ProductCard";
 import ProductFilters from "../components/product/ProductFilters";
@@ -10,12 +12,18 @@ import Loader from "../components/common/Loader";
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
-  const { products, page, pages, total, loading } = useSelector((s) => s.products);
-  const [sort, setSort] = useState(searchParams.get("sort") || "");
+
+  const { products, page, pages, total, loading } = useSelector(
+    (s) => s.products
+  );
+
+  const [sort, setSort] = useState(searchParams.get("sort") || "popular");
 
   useEffect(() => {
     const params = Object.fromEntries(searchParams.entries());
+
     dispatch(fetchProducts({ ...params, sort: sort || params.sort }));
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [searchParams, sort, dispatch]);
 
@@ -27,56 +35,81 @@ const Products = () => {
 
   const handleSort = (val) => {
     setSort(val);
+
     const next = new URLSearchParams(searchParams);
+
     if (val) next.set("sort", val);
     else next.delete("sort");
+
     next.delete("page");
     setSearchParams(next);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-10 md:py-14">
-      <div className="mb-8">
-        <p className="text-[11px] tracking-[0.3em] uppercase text-blush-600 font-semibold mb-2">Shop</p>
-        <h1 className="section-title font-semibold">All Products</h1>
-        <p className="text-sm text-ink/50 mt-2">{total} products available</p>
-      </div>
+    <main className="min-h-screen bg-[#faf7f2]">
 
-      <div className="grid lg:grid-cols-[260px_1fr] gap-8">
-        <ProductFilters />
+      <div className="mx-auto max-w-7xl px-4 py-7 md:px-8 md:py-12">
 
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <p className="text-sm text-ink/50">{loading ? "Loading…" : `${products.length} shown`}</p>
-            <select
-              value={sort}
-              onChange={(e) => handleSort(e.target.value)}
-              className="border border-ink/15 rounded-full px-4 py-2 text-sm bg-white outline-none focus:border-ink"
-            >
-              <option value="">Newest</option>
-              <option value="popular">Popularity</option>
-              <option value="price-asc">Price: Low → High</option>
-              <option value="price-desc">Price: High → Low</option>
-              <option value="rating">Top Rated</option>
-            </select>
-          </div>
+        
+       
 
-          {loading ? (
-            <Loader />
-          ) : products.length === 0 ? (
-            <div className="text-center py-24 text-ink/40">No products found matching your filters.</div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {products.map((p, i) => (
-                <ProductCard key={p._id} product={p} index={i} />
-              ))}
-            </div>
-          )}
+        {/* Products Layout */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[245px_1fr] lg:gap-8">
 
-          <Pagination page={page} pages={pages} onChange={handlePageChange} />
+          {/* Filters */}
+          <aside>
+            <ProductFilters />
+          </aside>
+
+          {/* Product Listing */}
+          <section className="min-w-0">
+            {/* Product Grid */}
+            {loading ? (
+              <div className="flex min-h-[350px] items-center justify-center">
+                <Loader />
+              </div>
+            ) : products.length === 0 ? (
+              <div className="flex min-h-[350px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#33251D]/15 bg-white px-5 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#f5efe6] text-[#8e705c]">
+                  <FiShoppingBag size={23} />
+                </div>
+
+                <h3 className="text-lg font-semibold text-[#33251D]">
+                  No Products Found
+                </h3>
+
+                <p className="mt-2 max-w-xs text-xs leading-5 text-[#9b897c]">
+                  We couldn't find products matching your selected filters.
+                  Try changing your filters.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 sm:gap-y-9 lg:grid-cols-3 lg:gap-x-6">
+                {products.map((p, i) => (
+                  <ProductCard
+                    key={p._id}
+                    product={p}
+                    index={i}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && products.length > 0 && pages > 1 && (
+              <div className="mt-10 border-t border-[#33251D]/10 pt-6">
+                <Pagination
+                  page={page}
+                  pages={pages}
+                  onChange={handlePageChange}
+                />
+              </div>
+            )}
+
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 
