@@ -1,6 +1,6 @@
 import multer from "multer";
 
-// ✅ Local storage hata kar memory storage use kiya
+// ✅ Memory storage use karein (RAM me hold karega, disk par save nahi karega)
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
@@ -14,7 +14,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
 export default upload;

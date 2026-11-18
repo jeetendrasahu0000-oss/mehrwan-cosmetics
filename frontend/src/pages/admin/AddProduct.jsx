@@ -22,10 +22,10 @@ const AddProduct = () => {
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // ✅ File Upload Handler
+  // ✅ Cloudinary File Upload Handler
   const handleImageUpload = async (e) => {
     const files = e.target.files;
-    if (!files.length) return;
+    if (!files || files.length === 0) return;
     
     const fd = new FormData();
     for (const f of files) fd.append("images", f);
@@ -33,12 +33,13 @@ const AddProduct = () => {
     setUploading(true);
     try {
       const res = await adminAPI.uploadImages(fd);
-      const base = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
-      const newUrls = res.data.images.map((p) => base + p);
+      // ✅ Cloudinary full URL deta hai, isliye base URL add nahi karna hai
+      const newUrls = res.data.images;
       
       setForm((f) => ({ ...f, images: [...f.images, ...newUrls] }));
     } catch (err) {
-      alert("Upload failed. Check console.");
+      console.error("Upload failed:", err);
+      alert("Image upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -80,7 +81,7 @@ const AddProduct = () => {
       });
       navigate("/admin/products");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed");
+      alert(err.response?.data?.message || "Failed to create product");
     }
   };
 
@@ -220,7 +221,7 @@ const AddProduct = () => {
               />
               <div className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-5 text-sm font-medium transition-colors ${uploading ? "border-gray-300 text-gray-400 bg-gray-50" : "border-blush-200 text-blush-700 hover:border-blush-400 hover:bg-blush-50/50"}`}>
                 <FiUploadCloud size={24} />
-                {uploading ? "Uploading..." : "Upload Images"}
+                {uploading ? "Uploading to Cloudinary..." : "Upload Images (Cloudinary)"}
               </div>
             </div>
             
@@ -244,7 +245,7 @@ const AddProduct = () => {
           </label>
           
           <button disabled={uploading} type="submit" className="btn-primary disabled:opacity-50 min-w-[150px]">
-            Create Product
+            {uploading ? "Uploading..." : "Create Product"}
           </button>
         </div>
       </form>
