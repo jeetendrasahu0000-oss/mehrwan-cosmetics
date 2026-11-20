@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FiArrowRight, FiLoader } from "react-icons/fi";
@@ -20,10 +19,8 @@ const SkeletonCard = () => (
 // Throttle
 const throttle = (callback, delay) => {
   let lastCall = 0;
-
   return (...args) => {
     const now = Date.now();
-
     if (now - lastCall >= delay) {
       lastCall = now;
       callback(...args);
@@ -34,14 +31,11 @@ const throttle = (callback, delay) => {
 // Debounce
 const debounce = (callback, delay) => {
   let timer;
-
   const debounced = (...args) => {
     clearTimeout(timer);
     timer = setTimeout(() => callback(...args), delay);
   };
-
   debounced.cancel = () => clearTimeout(timer);
-
   return debounced;
 };
 
@@ -55,6 +49,7 @@ const TrendingProducts = () => {
   const pageRef = useRef(1);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
+  const hasAutoScrolled = useRef(false); // ✅ Auto-scroll track karne ke liye
 
   // Fetch Trending Products
   const fetchProducts = useCallback(async (page = 1) => {
@@ -80,21 +75,16 @@ const TrendingProducts = () => {
       setProducts((prev) => {
         if (page === 1) return newProducts;
 
-        const existingIds = new Set(
-          prev.map((product) => product._id)
-        );
-
+        const existingIds = new Set(prev.map((product) => product._id));
         const uniqueProducts = newProducts.filter(
           (product) => !existingIds.has(product._id)
         );
-
         return [...prev, ...uniqueProducts];
       });
 
       pageRef.current = page;
 
       const pagination = res.data?.pagination;
-
       const moreAvailable = pagination
         ? pagination.hasNextPage ??
           (pagination.totalPages != null
@@ -118,35 +108,50 @@ const TrendingProducts = () => {
     fetchProducts(1);
   }, [fetchProducts]);
 
+  // ✅ AUTO SCROLL LOGIC (Sirf ek baar chalega)
+  useEffect(() => {
+    if (!initialLoading && products.length > 0 && !hasAutoScrolled.current) {
+      const timer = setTimeout(() => {
+        if (carouselRef.current) {
+          const container = carouselRef.current;
+          const cardWidth = container.firstChild?.clientWidth || 0;
+          const gap = 16; // Tailwind gap-4
+
+          // Ek card aage scroll karo
+          container.scrollBy({ left: cardWidth + gap, behavior: "smooth" });
+          
+          // Flag set karo taaki dobara na chale
+          hasAutoScrolled.current = true;
+        }
+      }, 1500); // 1.5 second baad slide hoga
+
+      return () => clearTimeout(timer);
+    }
+  }, [initialLoading, products]);
+
   // Horizontal Infinite Scroll
   const checkHorizontalScroll = useCallback(() => {
     const slider = carouselRef.current;
-
     if (!slider || loadingRef.current || !hasMoreRef.current) return;
 
-    const remaining =
-      slider.scrollWidth - slider.scrollLeft - slider.clientWidth;
-
+    const remaining = slider.scrollWidth - slider.scrollLeft - slider.clientWidth;
     if (remaining < 350) {
       fetchProducts(pageRef.current + 1);
     }
   }, [fetchProducts]);
 
+  // Throttle + Debounce ke saath scroll listener
   useEffect(() => {
     const slider = carouselRef.current;
-
     if (!slider) return;
 
     const debouncedCheck = debounce(checkHorizontalScroll, 120);
-
     const throttledCheck = throttle(() => {
       checkHorizontalScroll();
       debouncedCheck();
     }, 200);
 
-    slider.addEventListener("scroll", throttledCheck, {
-      passive: true,
-    });
+    slider.addEventListener("scroll", throttledCheck, { passive: true });
 
     return () => {
       slider.removeEventListener("scroll", throttledCheck);
@@ -157,7 +162,6 @@ const TrendingProducts = () => {
   // Mouse Wheel Horizontal Scrolling
   const handleWheel = (event) => {
     const slider = carouselRef.current;
-
     if (!slider) return;
 
     if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
@@ -165,7 +169,6 @@ const TrendingProducts = () => {
     }
   };
 
-  // Hide if no products
   if (!initialLoading && products.length === 0) {
     return null;
   }
@@ -180,10 +183,8 @@ const TrendingProducts = () => {
             <span className="mb-1 block text-[9px] font-semibold uppercase tracking-[0.25em] text-blush-600">
               Customer favourites
             </span>
-
             <h2 className="font-serif text-2xl font-semibold text-ink md:text-3xl">
-              Trending Now
-              <span className="text-blush-500">.</span>
+              Trending Now<span className="text-blush-500">.</span>
             </h2>
           </div>
 
@@ -202,13 +203,11 @@ const TrendingProducts = () => {
           onWheel={handleWheel}
           className="flex cursor-grab gap-3 overflow-x-auto scroll-smooth pb-4 active:cursor-grabbing snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:gap-4"
         >
-          {/* Initial Skeleton */}
           {initialLoading &&
             Array.from({ length: PAGE_SIZE }).map((_, index) => (
               <SkeletonCard key={`initial-${index}`} />
             ))}
 
-          {/* Products */}
           {products.map((product, index) => (
             <div
               key={product._id}
@@ -221,14 +220,12 @@ const TrendingProducts = () => {
             </div>
           ))}
 
-          {/* Loading More Skeleton */}
           {loadingMore &&
             Array.from({ length: PAGE_SIZE }).map((_, index) => (
               <SkeletonCard key={`loading-${index}`} />
             ))}
         </div>
 
-        {/* Loading Indicator */}
         {loadingMore && (
           <div className="mt-4 flex items-center justify-center gap-2 text-xs text-ink/60">
             <FiLoader className="animate-spin text-blush-500" />
@@ -236,7 +233,6 @@ const TrendingProducts = () => {
           </div>
         )}
 
-        {/* End Message */}
         {!hasMore && products.length > 0 && (
           <p className="mt-6 text-center font-serif text-xs text-ink/50">
             You've seen all trending products.

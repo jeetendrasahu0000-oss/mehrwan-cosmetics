@@ -4,12 +4,12 @@ const bannerSchema = new mongoose.Schema(
   {
     title: String,
     subtitle: String,
-    image: { type: String, required: true }, // Ye thumbnail (cover photo) ka kaam karega
-    videoUrl: { type: String, default: "" }, // 👈 Naya field video link ke liye
-    link: String, // Jahan redirect hona hai (e.g. Instagram reel link)
+    image: { type: String, required: true },
+    videoUrl: { type: String, default: "" },
+    link: String,
     type: {
       type: String,
-      enum: ["hero", "promotional", "collection", "instagram", "video"], // 👈 "video" add kiya
+      enum: ["hero", "promotional", "collection", "instagram", "announcement", "video"],
       default: "hero",
     },
     isActive: { type: Boolean, default: true },

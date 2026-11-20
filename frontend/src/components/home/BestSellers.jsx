@@ -15,6 +15,7 @@ const BestSellers = () => {
 
   const scrollRef = useRef(null);
   const loadingRef = useRef(false);
+  const hasAutoScrolled = useRef(false); // ✅ Track karega ki auto-scroll ho chuka hai ya nahi
 
   const fetchProducts = useCallback(async (pageNumber = 1) => {
     if (loadingRef.current) return;
@@ -58,9 +59,7 @@ const BestSellers = () => {
       const pagination = responseData?.pagination;
 
       if (pagination) {
-        setHasMore(
-          pagination.currentPage < pagination.totalPages
-        );
+        setHasMore(pagination.currentPage < pagination.totalPages);
       } else {
         setHasMore(newProducts.length === PAGE_SIZE);
       }
@@ -79,21 +78,38 @@ const BestSellers = () => {
     fetchProducts(1);
   }, [fetchProducts]);
 
+  // ✅ AUTO SCROLL LOGIC (Sirf ek baar chalega)
+  useEffect(() => {
+    if (!loading && products.length > 0 && !hasAutoScrolled.current) {
+      const timer = setTimeout(() => {
+        if (scrollRef.current) {
+          const container = scrollRef.current;
+          const cardWidth = container.firstChild?.clientWidth || 0;
+          const gap = 16; // Tailwind gap-4
+          
+          // Ek card aage scroll karo
+          container.scrollBy({ left: cardWidth + gap, behavior: "smooth" });
+          
+          // Flag set karo taaki dobara na chale
+          hasAutoScrolled.current = true;
+        }
+      }, 1500); // 1.5 second baad slide hoga
+
+      return () => clearTimeout(timer);
+    }
+  }, [loading, products]);
+
   const loadMore = useCallback(() => {
     if (!hasMore || loadingRef.current || loading) return;
-
     fetchProducts(page + 1);
   }, [hasMore, loading, page, fetchProducts]);
 
   const handleScroll = () => {
     const container = scrollRef.current;
-
     if (!container) return;
 
     const remaining =
-      container.scrollWidth -
-      container.scrollLeft -
-      container.clientWidth;
+      container.scrollWidth - container.scrollLeft - container.clientWidth;
 
     if (remaining < 350) {
       loadMore();
@@ -102,7 +118,6 @@ const BestSellers = () => {
 
   const handleWheel = (event) => {
     const container = scrollRef.current;
-
     if (!container) return;
 
     if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
@@ -119,8 +134,6 @@ const BestSellers = () => {
         {/* Heading */}
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-           
-
             <h2 className="font-serif text-xl font-semibold text-ink md:text-2xl">
               Best Sellers
               <span className="text-blush-500">.</span>
@@ -136,7 +149,7 @@ const BestSellers = () => {
           </Link>
         </div>
 
-        {/* Products */}
+        {/* Products Carousel */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}

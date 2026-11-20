@@ -62,7 +62,8 @@ const ProductDetails = () => {
         setProduct(res.data);
         setActiveImg(0);
         setVariant(res.data.variants?.[0]?.value || "");
-        // Related fail ho to page na hate, bas related section chhupa do
+        
+        // ✅ Related products fetch karein
         productAPI
           .getRelated(id)
           .then((r) => active && setRelated(r.data || []))
@@ -104,7 +105,7 @@ const ProductDetails = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 md:px-8 md:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-5 md:px-8 md:py-8 bg-[#faf7f2]">
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs text-ink/50 md:mb-6">
         <Link to="/" className="hover:text-ink">Home</Link>
@@ -119,7 +120,7 @@ const ProductDetails = () => {
       <div className="grid gap-6 md:grid-cols-2 md:gap-10 lg:gap-14">
         {/* Gallery */}
         <div className="md:sticky md:top-20 md:self-start">
-          <div className="mb-3 aspect-square overflow-hidden rounded-2xl bg-nude-50">
+          <div className="mb-3 aspect-square overflow-hidden rounded-2xl bg-white border border-ink/5">
             <img
               src={images[activeImg] || PLACEHOLDER}
               alt={product.name}
@@ -132,9 +133,7 @@ const ProductDetails = () => {
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
-                  aria-label={`View image ${i + 1}`}
-                  aria-current={i === activeImg}
-                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition-colors md:h-16 md:w-16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition-colors md:h-16 md:w-16 ${
                     i === activeImg ? "border-ink" : "border-transparent opacity-80 hover:opacity-100"
                   }`}
                 >
@@ -184,7 +183,7 @@ const ProductDetails = () => {
 
           {/* Variants */}
           {product.variants?.length > 0 && (
-            <div className="mt-5" role="group" aria-label="Variant">
+            <div className="mt-5">
               <p className="mb-2 text-sm font-semibold text-ink">Variant</p>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((v, i) => {
@@ -193,11 +192,8 @@ const ProductDetails = () => {
                     <button
                       key={i}
                       onClick={() => setVariant(v.value)}
-                      aria-pressed={selected}
-                      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
-                        selected
-                          ? "border-ink bg-ink text-cream"
-                          : "border-ink/20 hover:border-ink"
+                      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                        selected ? "border-ink bg-ink text-cream" : "border-ink/20 hover:border-ink"
                       }`}
                     >
                       {v.name}: {v.value}
@@ -215,18 +211,14 @@ const ProductDetails = () => {
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
                 disabled={outOfStock || qty <= 1}
                 className={stepBtn}
-                aria-label="Decrease quantity"
               >
                 <FiMinus size={14} />
               </button>
-              <span className="w-7 text-center text-sm font-semibold" aria-live="polite">
-                {qty}
-              </span>
+              <span className="w-7 text-center text-sm font-semibold">{qty}</span>
               <button
                 onClick={() => setQty((q) => Math.min(product.stock, q + 1))}
                 disabled={outOfStock || qty >= product.stock}
                 className={stepBtn}
-                aria-label="Increase quantity"
               >
                 <FiPlus size={14} />
               </button>
@@ -243,12 +235,8 @@ const ProductDetails = () => {
 
             <button
               onClick={handleWish}
-              aria-pressed={inWishlist}
-              aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 ${
-                inWishlist
-                  ? "border-blush-500 bg-blush-500 text-white"
-                  : "border-ink/20 hover:bg-blush-50"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                inWishlist ? "border-blush-500 bg-blush-500 text-white" : "border-ink/20 hover:bg-blush-50"
               }`}
             >
               <FiHeart fill={inWishlist ? "currentColor" : "none"} />
@@ -269,13 +257,20 @@ const ProductDetails = () => {
         </div>
       </div>
 
+      {/* Reviews Section */}
       <ReviewSection productId={product._id} />
 
+      {/* ✅ RELATED PRODUCTS SECTION */}
       {related.length > 0 && (
-        <section className="mt-10 md:mt-14">
-          <h2 className="mb-4 font-serif text-xl font-semibold text-ink md:mb-6 md:text-2xl">
-            You may also like
-          </h2>
+        <section className="mt-12 md:mt-16 pt-8 border-t border-ink/10">
+          <div className="mb-6 text-center md:text-left">
+            <p className="text-[10px] tracking-[0.3em] uppercase text-blush-600 font-semibold mb-1">
+              Complete your routine
+            </p>
+            <h2 className="font-serif text-2xl md:text-3xl font-semibold text-ink">
+              You may also like
+            </h2>
+          </div>
           <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-4">
             {related.slice(0, 4).map((p, i) => (
               <ProductCard key={p._id} product={p} index={i} />
