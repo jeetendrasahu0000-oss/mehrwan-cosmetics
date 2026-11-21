@@ -47,20 +47,20 @@ const ProductCard = ({ product, index = 0 }) => {
   };
 
   return (
+    // ✅ Y-jump hataya, sirf smooth scale aur opacity rakha
     <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.2) }}
-      className="h-full"
+      initial={{ opacity: 0, scale: 0.98 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true, margin: "0px 0px -50px 0px" }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="h-full will-change-[opacity,transform]"
     >
       <Link
         to={`/product/${product._id}`}
         className="group block h-full"
       >
-        {/* Product Image */}
-        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-[#f5efe6]">
-
+        {/* Product Image Container */}
+        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-[#f5efe6] isolate">
           <img
             src={
               product.images?.[0] ||
@@ -68,11 +68,11 @@ const ProductCard = ({ product, index = 0 }) => {
             }
             alt={product.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
           />
 
           {/* Image Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none" />
 
           {/* Discount Badge */}
           {hasDiscount && (
@@ -81,9 +81,8 @@ const ProductCard = ({ product, index = 0 }) => {
             </span>
           )}
 
-          {/* Wishlist & Cart */}
+          {/* Wishlist & Cart Actions */}
           <div className="absolute right-3 top-3 flex flex-col gap-2 sm:translate-x-3 sm:opacity-0 sm:transition-all sm:duration-300 sm:group-hover:translate-x-0 sm:group-hover:opacity-100">
-
             <button
               onClick={handleWishlist}
               aria-label="Add to wishlist"
@@ -111,9 +110,6 @@ const ProductCard = ({ product, index = 0 }) => {
 
         {/* Product Details */}
         <div className="px-0.5 pt-3.5">
-
-        
-
           <h3 className="mt-1.5 line-clamp-2 min-h-[40px] text-[13px] font-semibold leading-5 text-[#33251D] transition-colors duration-300 group-hover:text-[#94715d] sm:text-[14px]">
             {product.name}
           </h3>
@@ -121,7 +117,6 @@ const ProductCard = ({ product, index = 0 }) => {
           {/* Rating */}
           <div className="mt-2 flex items-center gap-1.5">
             <Rating value={product.rating} size={12} />
-            
           </div>
 
           {/* Price */}
@@ -142,7 +137,6 @@ const ProductCard = ({ product, index = 0 }) => {
               </>
             )}
           </div>
-
         </div>
       </Link>
     </motion.div>
