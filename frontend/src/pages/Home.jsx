@@ -9,11 +9,13 @@ import CustomerReviews from "../components/home/CustomerReviews";
 import VideoReels from "../components/home/VideoReels"; // 👈 Import kiya
 import InstagramGallery from "../components/home/InstagramGallery";
 import Newsletter from "../components/home/Newsletter";
+import BrandSection from "../components/home/BrandSection";
 
 const Home = () => (
   <>
     <HeroBanner />
     <CategorySection />
+    <BrandSection/>
     <BestSellers />
     <NewArrivals />
     <FeaturedCollections />
