@@ -57,7 +57,7 @@ const Navbar = () => {
   const [suggestions, setSuggestions] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  // ✅ NEW: Recent Searches
+  // ✅ Recent Searches State
   const [recentSearches, setRecentSearches] = useState([]);
 
   const userRef = useRef(null);
@@ -85,25 +85,22 @@ const Navbar = () => {
         if (Array.isArray(parsed)) setRecentSearches(parsed);
       }
     } catch (e) {
-      console.error("Failed to parse recent searches", e);
+      console.error("Failed to parse recent searches");
     }
   }, []);
 
-  // ✅ Save a search term
+  // ✅ Save search term
   const saveSearchTerm = (term) => {
     if (!term.trim()) return;
     const cleanTerm = term.trim();
-    
-    // Remove existing term and add to top
     const updated = [cleanTerm, ...recentSearches.filter((t) => t !== cleanTerm)].slice(0, 6);
-    
     setRecentSearches(updated);
     localStorage.setItem("mehrwan_recent_searches", JSON.stringify(updated));
   };
 
-  // ✅ Remove a single recent search
+  // ✅ Remove one recent search
   const removeRecentSearch = (term, e) => {
-    e.stopPropagation(); // Prevent the parent button click
+    e.stopPropagation();
     const updated = recentSearches.filter((t) => t !== term);
     setRecentSearches(updated);
     localStorage.setItem("mehrwan_recent_searches", JSON.stringify(updated));
@@ -156,8 +153,12 @@ const Navbar = () => {
     };
 
     const onClick = (e) => {
-      if (userRef.current && !userRef.current.contains(e.target)) setUserMenu(false);
-      if (categoryRef.current && !categoryRef.current.contains(e.target)) setCategoryOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target)) {
+        setUserMenu(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) {
+        setCategoryOpen(false);
+      }
     };
 
     document.addEventListener("keydown", onKey);
@@ -177,7 +178,7 @@ const Navbar = () => {
     };
   }, [mobileOpen, searchOpen]);
 
-  // Search Suggestions logic
+  // Debounced search suggestions
   useEffect(() => {
     if (searchTerm.trim().length < 2) {
       setSuggestions([]);
@@ -208,7 +209,9 @@ const Navbar = () => {
 
     const have = new URLSearchParams(search);
     if (query) {
-      return [...new URLSearchParams(query)].every(([k, v]) => have.get(k) === v);
+      return [...new URLSearchParams(query)].every(
+        ([k, v]) => have.get(k) === v
+      );
     }
     return !have.has("category") && !have.has("sort");
   };
@@ -217,14 +220,13 @@ const Navbar = () => {
     e.preventDefault();
     const term = searchTerm.trim();
     if (!term) return;
-    
-    saveSearchTerm(term); // ✅ Save
+    saveSearchTerm(term);
     navigate(`/products?keyword=${encodeURIComponent(term)}`);
     closeAll();
   };
 
   const handleRecentClick = (term) => {
-    saveSearchTerm(term); // ✅ Save when clicked from recent or popular
+    saveSearchTerm(term);
     navigate(`/products?keyword=${encodeURIComponent(term)}`);
     closeAll();
   };
@@ -347,10 +349,11 @@ const Navbar = () => {
               onClick={() => {
                 setUserMenu(false);
                 setCategoryOpen(false);
-                setSearchOpen(true); 
+                setSearchOpen((v) => !v);
               }}
               className={iconBtn}
               aria-label="Search"
+              aria-expanded={searchOpen}
             >
               <FiSearch size={21} />
             </button>
@@ -428,70 +431,49 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* ✅ FIXED: Mobile Search UI (Smooth & Optimized) */}
+        {/* ✅ TOP SEARCH DROPDOWN (With Recent Searches) */}
         <AnimatePresence>
           {searchOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setSearchOpen(false)}
-                className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
-              />
-              
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed inset-x-0 bottom-0 z-[70] flex h-[90dvh] flex-col overflow-hidden rounded-t-3xl bg-[#f5efe6] shadow-2xl"
-              >
-                {/* Header with Input */}
-                <div className="shrink-0 rounded-t-3xl bg-[#f5efe6] px-4 pt-3 pb-3 md:px-8 border-b border-ink/5">
-                  <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-black/10" />
-                  
-                  <form onSubmit={handleSearch} className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-ink/40" />
-                      <input
-                        autoFocus
-                        type="search"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search for products..."
-                        className="w-full rounded-xl border-none bg-white py-3 pl-10 pr-10 text-[15px] text-ink shadow-sm placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-ink/20"
-                      />
-                      {searchTerm && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchTerm("")}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink"
-                        >
-                          <FiX size={16} />
-                        </button>
-                      )}
-                    </div>
-                    {/* Close button outside input to prevent overlap on mobile */}
-                    <button
-                      type="button"
-                      onClick={() => setSearchOpen(false)}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink text-white shadow-sm hover:bg-ink/90"
-                      aria-label="Close Search"
-                    >
-                      <FiX size={20} />
-                    </button>
-                  </form>
-                </div>
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute left-0 top-full z-40 w-full overflow-visible border-b border-ink/5 bg-white shadow-md"
+            >
+              <div className="relative mx-auto max-w-3xl px-4 py-4 md:py-5">
+                <form onSubmit={handleSearch} className="relative flex items-center gap-3">
+                  <FiSearch className="shrink-0 text-lg text-ink/40" />
+                  <input
+                    autoFocus
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search serums, lipsticks, fragrances..."
+                    className="w-full border-none bg-transparent font-serif text-base text-ink placeholder:text-ink/30 focus:outline-none focus:ring-0 md:text-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchTerm("");
+                      setSuggestions([]);
+                    }}
+                    className={iconBtn}
+                    aria-label="Close search"
+                  >
+                    <FiX />
+                  </button>
+                </form>
 
-                {/* Scrollable Content Area */}
-                <div className="flex-1 overflow-y-auto px-4 pb-8 pt-4 md:px-8 custom-scrollbar">
+                {/* ✅ RECENT SEARCHES & SUGGESTIONS DROPDOWN */}
+                <div className="absolute left-0 top-full mt-1 w-full overflow-hidden rounded-b-xl bg-white shadow-xl">
                   
-                  {/* Recent Searches */}
+                  {/* Recent Searches (Only show if no active search text) */}
                   {!searchTerm && recentSearches.length > 0 && (
-                    <div className="mb-6">
+                    <div className="p-4 border-b border-ink/5">
                       <div className="mb-3 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-ink/70">Recent Searches</h3>
+                        <h3 className="text-xs font-semibold text-ink/70">Recent Searches</h3>
                         <button
                           onClick={clearRecentSearches}
                           className="flex items-center gap-1 text-xs font-medium text-[#A64D5A] hover:text-[#8b3f4b]"
@@ -503,16 +485,16 @@ const Navbar = () => {
                         {recentSearches.map((term, idx) => (
                           <div
                             key={idx}
-                            className="group flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-sm text-ink shadow-sm transition-all hover:bg-white hover:shadow-md cursor-pointer"
+                            className="group flex items-center gap-2 rounded-full bg-[#f5efe6] px-3 py-1.5 text-sm text-ink shadow-sm transition-all hover:bg-white cursor-pointer"
                             onClick={() => handleRecentClick(term)}
                           >
-                            <FiClock className="text-ink/40 group-hover:text-ink/60" size={14} />
-                            <span className="max-w-[150px] truncate">{term}</span>
+                            <FiClock className="text-ink/40 group-hover:text-ink/60" size={13} />
+                            <span className="max-w-[120px] truncate">{term}</span>
                             <button
                               onClick={(e) => removeRecentSearch(term, e)}
                               className="ml-0.5 text-ink/30 hover:text-red-500"
                             >
-                              <FiX size={14} />
+                              <FiX size={13} />
                             </button>
                           </div>
                         ))}
@@ -520,30 +502,50 @@ const Navbar = () => {
                     </div>
                   )}
 
-                  {/* Suggestions */}
+                  {/* Popular Right Now (Only show if no active search text) */}
+                  {!searchTerm && recentSearches.length === 0 && (
+                    <div className="p-4 border-b border-ink/5">
+                      <h3 className="mb-3 text-xs font-semibold text-ink/70">Popular Right Now</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {["Vitamin C Serum", "Matte Lipstick", "Face Wash", "Sunscreen"].map((term) => (
+                           <button
+                             key={term}
+                             onClick={() => handleRecentClick(term)}
+                             className="rounded-full border border-ink/10 bg-transparent px-3 py-1.5 text-xs text-ink/70 hover:bg-[#f5efe6] hover:text-ink transition-all"
+                           >
+                             {term}
+                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Suggestions */}
                   {searchTerm.trim().length > 1 && (
-                    <div className="rounded-xl bg-white p-2 shadow-sm">
+                    <div>
                       {searchLoading ? (
                         <div className="p-6 text-center text-sm text-ink/50">Searching...</div>
                       ) : suggestions.length > 0 ? (
                         <>
-                          {suggestions.map((p) => (
-                            <Link
-                              key={p._id}
-                              to={`/product/${p._id}`}
-                              onClick={closeAll}
-                              className="flex items-center gap-3.5 rounded-lg p-2.5 transition-colors hover:bg-blush-50"
-                            >
-                              <img src={p.images?.[0]} alt={p.name} className="h-12 w-12 rounded-lg bg-gray-100 object-cover" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
-                                <p className="text-xs text-ink/50">{p.brand} · ₹{p.discountPrice || p.price}</p>
-                              </div>
-                            </Link>
-                          ))}
+                          <div className="p-2">
+                            {suggestions.map((p) => (
+                              <Link
+                                key={p._id}
+                                to={`/product/${p._id}`}
+                                onClick={closeAll}
+                                className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-blush-50"
+                              >
+                                <img src={p.images?.[0]} alt={p.name} className="h-10 w-10 rounded bg-gray-100 object-cover" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-semibold text-ink">{p.name}</p>
+                                  <p className="text-xs text-ink/50">{p.brand} · ₹{p.discountPrice || p.price}</p>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
                           <button 
                             onClick={handleSearch} 
-                            className="mt-2 w-full rounded-lg bg-blush-50 py-3 text-center text-sm font-semibold text-blush-700 transition-colors hover:bg-blush-100"
+                            className="w-full bg-blush-50/50 py-2.5 text-center text-sm font-semibold text-blush-700 transition-colors hover:bg-blush-50"
                           >
                             View all results for "{searchTerm}"
                           </button>
@@ -554,31 +556,12 @@ const Navbar = () => {
                     </div>
                   )}
 
-                  {/* Popular Suggestions */}
-                  {!searchTerm && (
-                    <div className="mt-6">
-                      <h3 className="mb-3 text-sm font-semibold text-ink/70">Popular Right Now</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {["Vitamin C Serum", "Matte Lipstick", "Face Wash", "Sunscreen", "Body Lotion"].map((term) => (
-                           <button
-                             key={term}
-                             onClick={() => handleRecentClick(term)}
-                             className="rounded-full border border-ink/10 bg-transparent px-4 py-2 text-sm text-ink/70 hover:bg-white hover:text-ink hover:shadow-sm transition-all"
-                           >
-                             {term}
-                           </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                 </div>
-              </motion.div>
-            </>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Mobile Drawer (Same as before) */}
         <AnimatePresence>
           {mobileOpen && (
             <>

@@ -1,22 +1,31 @@
 import HeroBanner from "../components/home/HeroBanner";
 import CategorySection from "../components/home/CategorySection";
+import BrandSection from "../components/home/BrandSection";
 import BestSellers from "../components/home/BestSellers";
 import NewArrivals from "../components/home/NewArrivals";
 import TrendingProducts from "../components/home/TrendingProducts";
 import FeaturedCollections from "../components/home/FeaturedCollections";
 import SpecialOffers from "../components/home/SpecialOffers";
 import CustomerReviews from "../components/home/CustomerReviews";
-import VideoReels from "../components/home/VideoReels"; // 👈 Import kiya
+import VideoReels from "../components/home/VideoReels";
 import InstagramGallery from "../components/home/InstagramGallery";
 import Newsletter from "../components/home/Newsletter";
-import BrandSection from "../components/home/BrandSection";
+
+// ✅ AnnouncementBar import karein
+import AnnouncementBar from "../components/common/AnnouncementBar";
 
 const Home = () => (
   <>
     <HeroBanner />
     <CategorySection />
-    <BrandSection/>
+    
+    {/* 1. Brand Section */}
+    <BrandSection />
+    
+    
+
     <BestSellers />
+    <AnnouncementBar />
     <NewArrivals />
     <FeaturedCollections />
     <TrendingProducts />

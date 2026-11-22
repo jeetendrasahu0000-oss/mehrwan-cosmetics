@@ -8,11 +8,9 @@ const BrandSection = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch products to extract unique brands
     API.get("/products", { params: { limit: 100 } })
       .then((res) => {
         const products = res.data.products || [];
-        // Extract unique brands and get one image for each
         const brandMap = {};
         products.forEach((p) => {
           if (p.brand && !brandMap[p.brand]) {
@@ -31,35 +29,31 @@ const BrandSection = () => {
   if (!loading && brands.length === 0) return null;
 
   return (
-    <section className="py-8 md:py-10 bg-[#faf7f2] overflow-hidden">
+    <section className="pt-4 pb-2 bg-[#faf7f2] overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         
-        {/* Heading */}
-        <div className="mb-6 flex items-end justify-between">
+        {/* Heading - Reduced margin */}
+        <div className="mb-4 flex items-end justify-between">
           <div>
-            <p className="text-[10px] tracking-[0.25em] uppercase text-[#94715d] font-bold mb-1.5">
-              Our Partners
-            </p>
+            
             <h2 className="font-serif text-xl md:text-2xl font-semibold text-ink">
               Top Brands<span className="text-blush-500">.</span>
             </h2>
           </div>
           <Link
             to="/brands"
-            className="text-xs font-semibold text-[#79624F] hover:text-black transition flex items-center gap-1"
+            className="text-xs font-semibold text-[#79624F] hover:text-black transition flex items-center gap-1 pb-1"
           >
             View All <span className="text-[10px]">→</span>
           </Link>
         </div>
 
-        {/* Brands Carousel */}
-        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-proximity">
-          
+        {/* Carousel - Reduced padding */}
+        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-proximity">
           {loading
-            ? // Skeleton Loader
-              Array.from({ length: 6 }).map((_, i) => (
+            ? Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex flex-col items-center gap-2 shrink-0 snap-start animate-pulse">
-                  <div className="h-20 w-20 md:h-24 md:w-24 rounded-full bg-[#ede3d5]" />
+                  <div className="h-[60px] w-[60px] md:h-[76px] md:w-[76px] rounded-full bg-[#ede3d5]" />
                   <div className="h-3 w-16 rounded bg-[#ede3d5]" />
                 </div>
               ))
@@ -74,10 +68,9 @@ const BrandSection = () => {
                 >
                   <Link
                     to={`/products?brand=${encodeURIComponent(brand.name)}`}
-                    className="group flex flex-col items-center gap-2.5 w-[80px] md:w-[100px]"
+                    className="group flex flex-col items-center gap-2 w-[80px] md:w-[90px]"
                   >
-                    {/* Compact Circular Image */}
-                    <div className="h-20 w-20 md:h-24 md:w-24 overflow-hidden rounded-full border border-ink/5 bg-white shadow-sm transition-all duration-300 group-hover:border-[#33251D]/20 group-hover:shadow-md">
+                    <div className="h-[60px] w-[60px] md:h-[76px] md:w-[76px] overflow-hidden rounded-full border border-ink/5 bg-white shadow-sm transition-all duration-300 group-hover:border-[#33251D]/20 group-hover:shadow-md">
                       <img
                         src={brand.image}
                         alt={brand.name}
@@ -86,7 +79,6 @@ const BrandSection = () => {
                       />
                     </div>
                     
-                    {/* Brand Name */}
                     <p className="text-center text-[11px] md:text-xs font-semibold text-ink/80 line-clamp-1 w-full group-hover:text-ink transition-colors">
                       {brand.name}
                     </p>

@@ -34,7 +34,7 @@ const CategoryAvatar = ({ name, image }) => {
   }
 
   return (
-    <div className="h-[60px] w-[60px] overflow-hidden rounded-full bg-[#ede3d5] ring-1 ring-[#e3d3c0] sm:h-[76px] sm:w-[76px]">
+    <div className="h-[60px] w-[60px] overflow-hidden rounded-full bg-[#ede3d5] ring-1 ring-[#e3d3c0] sm:h-[76px] sm:w-[76px] shadow-sm">
       <img
         src={image}
         alt={name}
@@ -68,41 +68,54 @@ const CategorySection = () => {
   if (!loading && categories.length === 0) return null;
 
   return (
-    <section className="bg-[#faf7f2] pt-1 pb-2">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="pt-4 pb-2 bg-[#faf7f2] overflow-hidden">
+      <div className="mx-auto max-w-7xl px-4 md:px-8">
         
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="my-[10px] font-serif text-xl font-semibold text-[#33251D] md:text-2xl">
-            Shop by Category.
-          </h2>
-          <Link to="/products" className="text-xs font-semibold text-[#79624F] transition hover:text-black">
-            View All →
+        {/* Heading - Reduced margin */}
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-[#94715d] font-bold mb-0.5">
+              Shop by Category
+            </p>
+            <h2 className="font-serif text-xl md:text-2xl font-semibold text-ink">
+              Explore Categories<span className="text-blush-500">.</span>
+            </h2>
+          </div>
+          <Link
+            to="/products"
+            className="text-xs font-semibold text-[#79624F] hover:text-black transition flex items-center gap-1 pb-1"
+          >
+            View All <span className="text-[10px]">→</span>
           </Link>
         </div>
 
-        <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6">
+        {/* Carousel - Reduced padding */}
+        <div className="flex gap-4 md:gap-6 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-proximity">
           {loading
             ? Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="flex min-w-[65px] shrink-0 animate-pulse flex-col items-center gap-1.5">
-                  <div className="h-[60px] w-[60px] rounded-full bg-[#ede3d5] sm:h-[76px] sm:w-[76px]" />
-                  <div className="h-3 w-14 rounded bg-[#ede3d5]" />
+                <div key={index} className="flex flex-col items-center gap-2 shrink-0 snap-start animate-pulse">
+                  <div className="h-[60px] w-[60px] md:h-[76px] md:w-[76px] rounded-full bg-[#ede3d5]" />
+                  <div className="h-3 w-16 rounded bg-[#ede3d5]" />
                 </div>
               ))
             : categories.map((category, index) => {
                 const name = category.name || category.categoryName || category.title;
 
                 return (
-                  <Link
+                  <div
                     key={category._id || index}
-                    /* ✅ FIX: URL mein ID bheji jaa rahi hai, Name nahi */
-                    to={`/products?category=${encodeURIComponent(category._id)}`}
-                    className="group flex min-w-[65px] shrink-0 flex-col items-center gap-1"
+                    className="shrink-0 snap-start"
                   >
-                    <CategoryAvatar name={name} image={category.image} />
-                    <span className="max-w-[85px] truncate text-center text-[11px] font-medium text-[#33251D] sm:text-xs">
-                      {name}
-                    </span>
-                  </Link>
+                    <Link
+                      to={`/products?category=${encodeURIComponent(category._id)}`}
+                      className="group flex flex-col items-center gap-2 w-[80px] md:w-[90px]"
+                    >
+                      <CategoryAvatar name={name} image={category.image} />
+                      <span className="text-center text-[11px] md:text-xs font-semibold text-ink/80 line-clamp-1 w-full group-hover:text-ink transition-colors">
+                        {name}
+                      </span>
+                    </Link>
+                  </div>
                 );
               })}
         </div>
