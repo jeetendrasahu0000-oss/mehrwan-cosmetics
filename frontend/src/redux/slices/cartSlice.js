@@ -12,10 +12,11 @@ export const fetchCart = createAsyncThunk("cart/fetch", async (_, { rejectWithVa
 
 export const addToCart = createAsyncThunk(
   "cart/add",
-  async ({ productId, qty, variant }, { rejectWithValue }) => {
+  async ({ productId, qty, variant, productName }, { rejectWithValue }) => {
     try {
       const res = await cartAPI.add({ productId, qty, variant });
-      return res.data;
+      // ✅ productName ko bhi return karein taaki popup me dikha sakein
+      return { ...res.data, productName };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message);
     }
@@ -60,10 +61,20 @@ export const applyCoupon = createAsyncThunk(
 
 const cartSlice = createSlice({
   name: "cart",
-  initialState: { cart: { items: [], coupon: null }, loading: false, error: null },
+  initialState: { 
+    cart: { items: [], coupon: null }, 
+    loading: false, 
+    error: null,
+    showPopup: false,      // ✅ Popup state
+    lastAddedItem: null,   // ✅ Product name for popup
+  },
   reducers: {
     clearCartLocal: (state) => {
       state.cart = { items: [], coupon: null };
+    },
+    hideCartPopup: (state) => {
+      state.showPopup = false;
+      state.lastAddedItem = null;
     },
   },
   extraReducers: (builder) => {
@@ -76,16 +87,27 @@ const cartSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     };
+    
     builder
-      .addCase(fetchCart.pending, (state) => {
-        state.loading = true;
-      })
+      .addCase(fetchCart.pending, (state) => { state.loading = true; })
       .addCase(fetchCart.fulfilled, fulfill)
       .addCase(fetchCart.rejected, reject)
-      .addCase(addToCart.fulfilled, fulfill)
+      
+      // ✅ Add to Cart success hone par popup show karein
+      .addCase(addToCart.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cart = action.payload;
+        state.error = null;
+        if (action.payload.productName) {
+          state.showPopup = true;
+          state.lastAddedItem = action.payload.productName;
+        }
+      })
       .addCase(addToCart.rejected, reject)
+      
       .addCase(updateCartItem.fulfilled, fulfill)
       .addCase(removeCartItem.fulfilled, fulfill)
+      
       .addCase(applyCoupon.fulfilled, (state, action) => {
         state.cart.coupon = action.payload.coupon;
       })
@@ -93,5 +115,5 @@ const cartSlice = createSlice({
   },
 });
 
-export const { clearCartLocal } = cartSlice.actions;
+export const { clearCartLocal, hideCartPopup } = cartSlice.actions;
 export default cartSlice.reducer;

@@ -34,7 +34,12 @@ const ProductCard = ({ product, index = 0 }) => {
 
     if (!user) return navigate("/login");
 
-    await dispatch(addToCart({ productId: product._id, qty: 1 }));
+    // ✅ Product Name bhi bhej rahe hain popup me dikhane ke liye
+    await dispatch(addToCart({ 
+      productId: product._id, 
+      qty: 1,
+      productName: product.name 
+    }));
   };
 
   const handleWishlist = async (e) => {
@@ -47,7 +52,6 @@ const ProductCard = ({ product, index = 0 }) => {
   };
 
   return (
-    // ✅ Y-jump hataya, sirf smooth scale aur opacity rakha
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       whileInView={{ opacity: 1, scale: 1 }}

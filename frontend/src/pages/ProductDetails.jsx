@@ -1,3 +1,4 @@
+// ... baaki imports same rahenge
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -86,12 +87,20 @@ const ProductDetails = () => {
   const outOfStock = !product.stock || product.stock <= 0;
   const images = product.images || [];
 
+  // ✅ UPDATED: Popup ke liye product name bhej rahe hain
   const handleAdd = async () => {
     if (!user) return navigate("/login");
     setAdding(true);
     try {
       const variantString = selectedVariant ? `${selectedVariant.name}: ${selectedVariant.value}` : "";
-      await dispatch(addToCart({ productId: product._id, qty, variant: variantString }));
+      const fullProductName = variantString ? `${product.name} (${variantString})` : product.name;
+      
+      await dispatch(addToCart({ 
+        productId: product._id, 
+        qty, 
+        variant: variantString,
+        productName: fullProductName 
+      }));
     } finally {
       setAdding(false);
     }
