@@ -1,9 +1,8 @@
-// ... baaki imports same rahenge
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  FiHeart, FiShoppingBag, FiMinus, FiPlus, FiChevronRight, FiChevronDown,
+  FiHeart, FiShoppingBag, FiMinus, FiPlus, FiChevronRight,
 } from "react-icons/fi";
 import { productAPI } from "../services/productService";
 import { addToCart } from "../redux/slices/cartSlice";
@@ -20,16 +19,6 @@ const stepBtn =
   "flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-ink/5 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 " +
   "disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent";
-
-const Detail = ({ title, children }) => (
-  <details className="group border-b border-ink/10 py-3">
-    <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
-      {title}
-      <FiChevronDown aria-hidden="true" className="text-ink/50 motion-safe:transition-transform group-open:rotate-180" />
-    </summary>
-    <p className="mt-2 text-sm leading-relaxed text-ink/60">{children}</p>
-  </details>
-);
 
 const ProductDetails = () => {
   const { id } = useParams();
@@ -75,7 +64,7 @@ const ProductDetails = () => {
   if (loading) return <Loader />;
   if (!product) return null;
 
-  // ✅ Perfect Price Calculation
+  // ✅ Price Calculation
   const basePrice = product.discountPrice || product.price;
   const extraPrice = selectedVariant?.priceAdjustment || 0;
   const finalPrice = basePrice + extraPrice;
@@ -87,7 +76,6 @@ const ProductDetails = () => {
   const outOfStock = !product.stock || product.stock <= 0;
   const images = product.images || [];
 
-  // ✅ UPDATED: Popup ke liye product name bhej rahe hain
   const handleAdd = async () => {
     if (!user) return navigate("/login");
     setAdding(true);
@@ -221,10 +209,20 @@ const ProductDetails = () => {
             </button>
           </div>
 
-          {/* Details */}
+          {/* ✅ UPDATED: Ingredients & Benefits (Dropdown Removed) */}
           <div className="mt-6 border-t border-ink/10">
-            {product.ingredients && <Detail title="Ingredients">{product.ingredients}</Detail>}
-            {product.benefits && <Detail title="Benefits">{product.benefits}</Detail>}
+            {product.ingredients && (
+              <div className="border-b border-ink/10 py-3">
+                <p className="text-sm font-semibold text-ink mb-1.5">Ingredients</p>
+                <p className="text-sm leading-relaxed text-ink/60">{product.ingredients}</p>
+              </div>
+            )}
+            {product.benefits && (
+              <div className="border-b border-ink/10 py-3">
+                <p className="text-sm font-semibold text-ink mb-1.5">Benefits</p>
+                <p className="text-sm leading-relaxed text-ink/60">{product.benefits}</p>
+              </div>
+            )}
             {product.skinType && (
               <div className="flex items-center justify-between border-b border-ink/10 py-3 text-sm">
                 <span className="font-semibold text-ink">Skin type</span>
@@ -237,6 +235,7 @@ const ProductDetails = () => {
 
       <ReviewSection productId={product._id} />
 
+      {/* ✅ UPDATED: Removed .slice(0, 4) to show all related products */}
       {related.length > 0 && (
         <section className="mt-12 md:mt-16 pt-8 border-t border-ink/10">
           <div className="mb-6 text-center md:text-left">
@@ -244,7 +243,7 @@ const ProductDetails = () => {
             <h2 className="font-serif text-2xl md:text-3xl font-semibold text-ink">You may also like</h2>
           </div>
           <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-4">
-            {related.slice(0, 4).map((p, i) => (
+            {related.map((p, i) => (
               <ProductCard key={p._id} product={p} index={i} />
             ))}
           </div>

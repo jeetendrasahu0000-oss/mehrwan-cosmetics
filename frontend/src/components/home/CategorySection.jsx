@@ -74,9 +74,7 @@ const CategorySection = () => {
         {/* Heading - Reduced margin */}
         <div className="mb-4 flex items-end justify-between">
           <div>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-[#94715d] font-bold mb-0.5">
-              Shop by Category
-            </p>
+          
             <h2 className="font-serif text-xl md:text-2xl font-semibold text-ink">
               Explore Categories<span className="text-blush-500">.</span>
             </h2>

@@ -18,18 +18,25 @@ export const getProducts = asyncHandler(async (req, res) => {
 
   const query = { isActive: true };
 
+  // ✅ FIXED SEARCH: Name, Brand, Description, Ingredients, Benefits
   if (keyword) {
+    const searchRegex = { $regex: keyword, $options: "i" };
+    
     query.$or = [
-      { name: { $regex: keyword, $options: "i" } },
-      { brand: { $regex: keyword, $options: "i" } },
-      { description: { $regex: keyword, $options: "i" } },
+      { name: searchRegex },
+      { brand: searchRegex },
+      { description: searchRegex },
+      { ingredients: searchRegex },
+      { benefits: searchRegex },
     ];
   }
+
   if (category) query.category = category;
   if (brand) query.brand = { $in: brand.split(",") };
   if (skinType) query.skinType = { $in: skinType.split(",") };
   if (rating) query.rating = { $gte: Number(rating) };
   if (featured) query.isFeatured = true;
+  
   if (minPrice || maxPrice) {
     query.price = {};
     if (minPrice) query.price.$gte = Number(minPrice);
@@ -111,15 +118,55 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 });
 
 export const getRelatedProducts = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findById(req.params.id).populate("category", "name");
+  
   if (!product) {
     res.status(404);
     throw new Error("Product not found");
   }
-  const related = await Product.find({
-    _id: { $ne: product._id },
-    category: product.category,
-    isActive: true,
-  }).limit(8);
+
+  const keywords = [
+    product.brand,
+    product.category?.name, 
+  ].filter(Boolean);
+
+  const textToSearch = [
+    product.name,
+    product.description,
+    product.ingredients,
+    product.benefits,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .split(" ")
+    .map((word) => word.replace(/[^a-zA-Z0-9]/g, ""))
+    .filter((word) => word.length > 3);
+
+  const uniqueKeywords = [...new Set([...keywords, ...textToSearch])];
+
+  let related;
+  if (uniqueKeywords.length === 0) {
+    related = await Product.find({
+      _id: { $ne: product._id },
+      category: product.category,
+      isActive: true,
+    }).limit(8);
+  } else {
+    const regexPattern = uniqueKeywords.join("|");
+    
+    related = await Product.find({
+      _id: { $ne: product._id },
+      isActive: true,
+      $or: [
+        { name: { $regex: regexPattern, $options: "i" } },
+        { brand: { $regex: regexPattern, $options: "i" } },
+        { description: { $regex: regexPattern, $options: "i" } },
+        { ingredients: { $regex: regexPattern, $options: "i" } },
+        { benefits: { $regex: regexPattern, $options: "i" } },
+        { category: product.category } 
+      ],
+    }).limit(8);
+  }
+
   res.json(related);
 });
