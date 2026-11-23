@@ -25,9 +25,7 @@ const BestSellers = () => {
 
   const scrollRef = useRef(null);
   const loadingRef = useRef(false);
-  const hasAutoScrolled = useRef(false);
-  const rafRef = useRef(null);
-  const debounceRef = useRef(null);
+  const hasAutoScrolled = useRef(false); // ✅ Sirf ek baar scroll track karne ke liye
 
   const fetchProducts = useCallback(async (pageNumber = 1) => {
     if (loadingRef.current) return;
@@ -78,57 +76,39 @@ const BestSellers = () => {
     fetchProducts(1);
   }, [fetchProducts]);
 
-  /* Auto Scroll */
+  // ✅ AUTO SCROLL LOGIC (Sirf ek baar chalega)
   useEffect(() => {
     if (!loading && products.length > 0 && !hasAutoScrolled.current) {
       const timer = setTimeout(() => {
         if (scrollRef.current) {
           const container = scrollRef.current;
           const cardWidth = container.firstChild?.clientWidth || 0;
-          const gap = 12; 
+          const gap = 12; // Tailwind gap-3
+          
+          // Ek card aage scroll karo
           container.scrollTo({ left: cardWidth + gap, behavior: "smooth" });
+          
+          // Flag set karo taaki dobara na chale
           hasAutoScrolled.current = true;
         }
-      }, 1500);
+      }, 1500); // 1.5 second baad slide hoga
+
       return () => clearTimeout(timer);
     }
   }, [loading, products]);
 
-  /* Throttled Scroll */
+  // ✅ Manual Scroll par load more
   const handleScroll = () => {
-    if (rafRef.current) return;
+    const container = scrollRef.current;
+    if (!container) return;
 
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      const container = scrollRef.current;
-      if (!container) return;
-
-      const remaining =
-        container.scrollWidth - container.scrollLeft - container.clientWidth;
-
-      if (remaining < 500 && hasMore && !loadingRef.current) {
-        loadMoreDebounced();
-      }
-    });
-  };
-
-  /* Debounced Load More */
-  const loadMoreDebounced = useCallback(() => {
-    if (debounceRef.current) return;
-
-    debounceRef.current = setTimeout(() => {
-      debounceRef.current = null;
-      if (loadingRef.current || !hasMore) return;
+    const remaining = container.scrollWidth - container.scrollLeft - container.clientWidth;
+    
+    // Agar user right end ke paas pahunch gaya, to naye products load karo
+    if (remaining < 300 && hasMore && !loadingRef.current) {
       fetchProducts(page + 1);
-    }, 150);
-  }, [fetchProducts, hasMore, page]);
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
+    }
+  };
 
   if (!loading && products.length === 0) return null;
 
@@ -150,14 +130,11 @@ const BestSellers = () => {
           </Link>
         </div>
 
-        {/* 
-          ✅ snap classes hata di
-          ✅ overscroll-x-contain aur touch-pan-y add kiya 
-        */}
+        {/* ✅ Manual Scrollable Container */}
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex gap-3 overflow-x-auto pb-2 pr-1 overscroll-x-contain touch-pan-y md:gap-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex gap-3 overflow-x-auto pb-2 pr-1 overscroll-x-contain touch-pan-y md:gap-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing scroll-smooth"
         >
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
