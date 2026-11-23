@@ -32,23 +32,23 @@ const BrandSection = () => {
     <section className="pt-4 pb-2 bg-[#faf7f2] overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 md:px-8">
         
-        {/* Heading - Reduced margin */}
+        {/* Heading */}
         <div className="mb-4 flex items-end justify-between">
           <div>
-            
             <h2 className="font-serif text-xl md:text-2xl font-semibold text-ink">
               Top Brands<span className="text-blush-500">.</span>
             </h2>
           </div>
+          {/* ✅ FIX: Link ko /products kar diya hai */}
           <Link
-            to="/brands"
+            to="/products"
             className="text-xs font-semibold text-[#79624F] hover:text-black transition flex items-center gap-1 pb-1"
           >
             View All <span className="text-[10px]">→</span>
           </Link>
         </div>
 
-        {/* Carousel - Reduced padding */}
+        {/* Carousel */}
         <div className="flex gap-4 md:gap-6 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-proximity">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
