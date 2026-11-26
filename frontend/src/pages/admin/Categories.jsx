@@ -1,77 +1,158 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiPlus,
-  FiEdit,
-  FiTrash2,
-  FiUploadCloud,
-  FiGrid,
-  FiTag,
-  FiImage,
-  FiX,
-  FiFolder,
-  FiArrowUpRight,
+  FiPlus, FiEdit, FiTrash2, FiMoreVertical, FiSearch,
+  FiRefreshCw, FiFilter, FiImage, FiX, FiFolder,
+  FiTag, FiUploadCloud, FiCheck,
 } from "react-icons/fi";
 import { adminAPI } from "../../services/adminService";
 
-const INITIAL_FORM = {
-  name: "",
-  description: "",
-  image: "",
-};
+const INITIAL_FORM = { name: "", description: "", image: "" };
 
-const AdminCategories = () => {
-  const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [editing, setEditing] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    try {
-      const res = await adminAPI.getAllCategories();
-      setCategories(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Failed to load categories:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+/* ---------- Row action menu (3 dots) ---------- */
+const RowMenu = ({ category, onEdit, onDelete, deleting }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
   useEffect(() => {
-    load();
-  }, []);
+    if (!open) return;
+    const onClick = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const onEsc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
 
-  const resetForm = () => {
-    setForm(INITIAL_FORM);
-    setEditing(null);
-  };
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More actions"
+        className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+          open ? "bg-ink/10 text-ink" : "text-ink/50 hover:bg-ink/5 hover:text-ink"
+        }`}
+      >
+        <FiMoreVertical className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-lg border border-ink/10 bg-white py-1 shadow-lg shadow-ink/5"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onEdit(category);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-ink/80 transition hover:bg-ink/5"
+          >
+            <FiEdit className="h-3.5 w-3.5" /> Edit category
+          </button>
+          <div className="my-1 h-px bg-ink/8" />
+          <button
+            type="button"
+            role="menuitem"
+            disabled={deleting}
+            onClick={() => {
+              setOpen(false);
+              onDelete(category._id);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
+            ) : (
+              <FiTrash2 className="h-3.5 w-3.5" />
+            )}
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ---------- Image thumb ---------- */
+const Thumb = ({ src, name, size = "md" }) => {
+  const dims = size === "lg" ? "h-16 w-16" : "h-12 w-12";
+  return (
+    <div className={`${dims} shrink-0 overflow-hidden rounded-lg border border-ink/10 bg-ink/5`}>
+      {src ? (
+        <img src={src} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-ink/30">
+          <FiImage className="h-4 w-4" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ---------- Modal ---------- */
+const Modal = ({ open, onClose, children, labelledBy }) => {
+  useEffect(() => {
+    if (!open) return;
+    const onEsc = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onEsc);
+      document.body.style.overflow = "";
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/* backdrop */}
+      <div
+        className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* panel: bottom sheet on mobile, centered on sm+ */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        className="relative w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl ring-1 ring-ink/10 sm:rounded-2xl"
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Category Form (inside modal) ---------- */
+const CategoryForm = ({ editing, initial, onSubmit, onCancel }) => {
+  const [form, setForm] = useState(initial || INITIAL_FORM);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm(initial || INITIAL_FORM);
+  }, [initial]);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append("images", file);
-
+    const fd = new FormData();
+    fd.append("images", file);
     setUploading(true);
-
     try {
-      const res = await adminAPI.uploadImages(formData);
-
-      const baseUrl = (
-        import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-      ).replace("/api", "");
-
-      const imageUrl = baseUrl + res.data.images[0];
-
-      setForm((prev) => ({
-        ...prev,
-        image: imageUrl,
-      }));
-    } catch (err) {
-      console.error("Upload failed:", err);
+      const res = await adminAPI.uploadImages(fd);
+      const baseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace("/api", "");
+      setForm((p) => ({ ...p, image: baseUrl + res.data.images[0] }));
+    } catch {
       alert("Image upload failed. Please try again.");
     } finally {
       setUploading(false);
@@ -81,500 +162,469 @@ const AdminCategories = () => {
 
   const submit = async (e) => {
     e.preventDefault();
-
-    if (!form.name.trim()) {
-      alert("Please enter category name.");
-      return;
-    }
-
+    if (!form.name.trim()) return;
     setSaving(true);
-
     try {
-      const payload = {
-        ...form,
-        name: form.name.trim(),
-      };
-
-      if (editing) {
-        await adminAPI.updateCategory(editing, payload);
-      } else {
-        await adminAPI.createCategory(payload);
-      }
-
-      resetForm();
-      await load();
-    } catch (err) {
-      console.error("Category save failed:", err);
-      alert(
-        err.response?.data?.message ||
-          "Failed to save category. Please try again."
-      );
+      await onSubmit({ ...form, name: form.name.trim() });
     } finally {
       setSaving(false);
     }
   };
 
+  return (
+    <form onSubmit={submit}>
+      {/* Header */}
+      <header className="flex items-start justify-between gap-3 border-b border-ink/8 px-4 py-3.5">
+        <div className="min-w-0">
+          <h2 id="cat-form-title" className="text-base font-semibold text-ink">
+            {editing ? "Edit category" : "Add category"}
+          </h2>
+          <p className="mt-0.5 text-[11px] text-ink/50">
+            {editing ? "Update the details below" : "Create a new product collection"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Close"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink/50 transition hover:bg-ink/5 hover:text-ink"
+        >
+          <FiX className="h-4 w-4" />
+        </button>
+      </header>
+
+      {/* Body */}
+      <div className="max-h-[70vh] space-y-3 overflow-y-auto p-4 sm:max-h-[60vh]">
+        <div>
+          <label htmlFor="cat-name" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink/60">
+            Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="cat-name"
+            required
+            autoFocus
+            placeholder="e.g. Skincare"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full rounded-lg border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="cat-desc" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink/60">
+            Description
+          </label>
+          <textarea
+            id="cat-desc"
+            rows={2}
+            placeholder="Short description…"
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="w-full resize-none rounded-lg border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink/60">
+            Image
+          </label>
+
+          <div className="relative">
+            <FiImage className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
+            <input
+              placeholder="Paste image URL…"
+              value={form.image}
+              onChange={(e) => setForm({ ...form, image: e.target.value })}
+              className="w-full rounded-lg border border-ink/15 bg-white py-2.5 pl-9 pr-3 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm"
+            />
+          </div>
+
+          <label
+            className={`mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-2.5 text-xs font-medium transition ${
+              uploading
+                ? "cursor-wait border-ink/10 bg-ink/[0.02] text-ink/40"
+                : "border-ink/20 text-ink/70 hover:border-ink/40 hover:bg-ink/[0.02]"
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploading}
+              className="sr-only"
+            />
+            <FiUploadCloud className="h-4 w-4" />
+            {uploading ? "Uploading…" : "Upload image"}
+          </label>
+
+          {form.image && (
+            <div className="mt-2.5 flex items-center gap-2.5 rounded-lg border border-ink/10 bg-ink/[0.02] p-2">
+              <Thumb src={form.image} name="preview" />
+              <p className="min-w-0 flex-1 truncate text-[11px] text-ink/60">
+                {form.image}
+              </p>
+              <button
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, image: "" }))}
+                aria-label="Remove image"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500 transition hover:bg-red-500 hover:text-white"
+              >
+                <FiX className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="flex gap-2 border-t border-ink/8 px-4 py-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 rounded-lg border border-ink/15 py-2.5 text-sm font-medium text-ink/70 transition hover:bg-ink/5"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={uploading || saving || !form.name.trim()}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink py-2.5 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:opacity-50"
+        >
+          {saving ? (
+            "Saving…"
+          ) : (
+            <>
+              <FiCheck className="h-4 w-4" />
+              {editing ? "Update" : "Create"}
+            </>
+          )}
+        </button>
+      </footer>
+    </form>
+  );
+};
+
+/* ---------- Main page ---------- */
+const AdminCategories = () => {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [deleting, setDeleting] = useState(null);
+
+  // modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // category id or null
+  const [initialForm, setInitialForm] = useState(INITIAL_FORM);
+
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await adminAPI.getAllCategories();
+      setCategories(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      /* noop */
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setTimeout(() => setRefreshing(false), 400);
+  };
+
+  const openAdd = () => {
+    setEditing(null);
+    setInitialForm(INITIAL_FORM);
+    setModalOpen(true);
+  };
+
+  const openEdit = (c) => {
+    setEditing(c._id);
+    setInitialForm({
+      name: c.name || "",
+      description: c.description || "",
+      image: c.image || "",
+    });
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditing(null);
+    setInitialForm(INITIAL_FORM);
+  };
+
+  const handleSubmit = async (payload) => {
+    try {
+      if (editing) await adminAPI.updateCategory(editing, payload);
+      else await adminAPI.createCategory(payload);
+      closeModal();
+      await load(true);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to save category.");
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm("Delete category permanently?")) return;
-
     try {
       setDeleting(id);
       await adminAPI.deleteCategory(id);
-      await load();
-
-      if (editing === id) {
-        resetForm();
-      }
-    } catch (err) {
-      console.error("Category deletion failed:", err);
+      await load(true);
+    } catch {
       alert("Failed to delete category.");
     } finally {
       setDeleting(null);
     }
   };
 
-  const handleEdit = (category) => {
-    setForm({
-      name: category.name || "",
-      description: category.description || "",
-      image: category.image || "",
+  /* ---- filter ---- */
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return categories.filter((c) => {
+      const mq = !q || c.name?.toLowerCase().includes(q) || c.description?.toLowerCase().includes(q);
+      const mf =
+        filter === "all" ||
+        (filter === "with" && c.image) ||
+        (filter === "without" && !c.image);
+      return mq && mf;
     });
+  }, [categories, query, filter]);
 
-    setEditing(category._id);
+  const FILTERS = [
+    { key: "all", label: "All" },
+    { key: "with", label: "With image" },
+    { key: "without", label: "No image" },
+  ];
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const inputClass =
-    "w-full rounded-xl border border-[#e9e0d7] bg-[#fdfbf9] px-3.5 py-3 text-xs text-[#33251D] outline-none transition-all placeholder:text-[#b4a69b] focus:border-[#947761] focus:bg-white focus:ring-2 focus:ring-[#947761]/10";
-
-  const labelClass =
-    "mb-2 block text-[11px] font-semibold text-[#594638]";
+  const withImage = categories.filter((c) => c.image).length;
 
   return (
-    <div className="min-h-screen space-y-6 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-[#a1816d]">
-            <FiGrid size={13} />
-            Store Management
-          </div>
-
-          <h1 className="text-2xl font-semibold tracking-tight text-[#33251D] sm:text-3xl">
+    <div className="space-y-4">
+      {/* ---------- Header ---------- */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-serif text-xl font-semibold text-ink sm:text-2xl md:text-3xl">
             Categories
           </h1>
-
-          <p className="mt-1.5 text-xs text-[#9b897c]">
-            Organize your products into beautiful shopping collections.
+          <p className="mt-0.5 text-[11px] text-ink/50 sm:text-sm">
+            {categories.length} total · {filtered.length} showing
           </p>
         </div>
-
-        <div className="flex w-fit items-center gap-3 rounded-2xl border border-[#e9e0d7] bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5eee7] text-[#80644f]">
-            <FiFolder size={19} />
-          </div>
-
-          <div>
-            <p className="text-xl font-bold text-[#33251D]">
-              {categories.length}
-            </p>
-            <p className="text-[10px] text-[#9b897c]">
-              Total Categories
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={openAdd}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-white transition hover:bg-ink/90 sm:text-sm"
+        >
+          <FiPlus className="h-4 w-4" /> Add category
+        </button>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[#e9e0d7] bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-[#9b897c]">
-              Total Categories
-            </p>
-            <FiGrid size={17} className="text-[#947761]" />
+      {/* ---------- Search + filters ---------- */}
+      <div className="rounded-xl bg-white p-2.5 ring-1 ring-ink/8 sm:p-3">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search categories…"
+              className="w-full rounded-lg border border-ink/12 bg-white py-2 pl-9 pr-8 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-ink/40 hover:bg-ink/5 hover:text-ink"
+              >
+                <FiX className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-
-          <h3 className="mt-3 text-2xl font-bold text-[#33251D]">
-            {categories.length}
-          </h3>
-
-          <p className="mt-1 text-[10px] text-[#a99a8e]">
-            All collections
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-[#e9e0d7] bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-[#9b897c]">
-              With Images
-            </p>
-            <FiImage size={17} className="text-green-600" />
-          </div>
-
-          <h3 className="mt-3 text-2xl font-bold text-[#33251D]">
-            {categories.filter((c) => c.image).length}
-          </h3>
-
-          <p className="mt-1 text-[10px] text-green-600">
-            Visual collections
-          </p>
-        </div>
-
-        <div className="col-span-2 rounded-2xl border border-[#e9e0d7] bg-white p-4 shadow-sm sm:col-span-1">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-[#9b897c]">
-              Without Images
-            </p>
-            <FiTag size={17} className="text-[#947761]" />
-          </div>
-
-          <h3 className="mt-3 text-2xl font-bold text-[#33251D]">
-            {categories.filter((c) => !c.image).length}
-          </h3>
-
-          <p className="mt-1 text-[10px] text-[#a99a8e]">
-            Pending images
-          </p>
-        </div>
-      </div>
-
-      {/* Main Layout */}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_350px]">
-
-        {/* Category List */}
-        <section className="min-w-0">
-
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[#33251D]">
-                All Categories
-              </h2>
-
-              <p className="mt-1 text-[11px] text-[#9b897c]">
-                View and manage your product collections.
-              </p>
-            </div>
-
-            <span className="rounded-full bg-[#f2e9df] px-3 py-1.5 text-[10px] font-semibold text-[#80644f]">
-              {categories.length} Collections
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="flex min-h-[280px] items-center justify-center rounded-2xl border border-[#e9e0d7] bg-white">
-              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-[#e9e0d7] border-t-[#80644f]" />
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#d9c9ba] bg-white p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5eee7] text-[#947761]">
-                <FiGrid size={27} />
-              </div>
-
-              <h3 className="text-base font-semibold text-[#33251D]">
-                No Categories Yet
-              </h3>
-
-              <p className="mt-2 max-w-xs text-xs leading-5 text-[#9b897c]">
-                Create your first category to organize your store products.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-[#e9e0d7] bg-white shadow-sm">
-
-              {/* Table Header */}
-              <div className="hidden grid-cols-[minmax(0,1fr)_120px] items-center border-b border-[#eee5dc] bg-[#faf7f2] px-5 py-3 sm:grid">
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#9b897c]">
-                  Category Details
-                </p>
-
-                <p className="text-right text-[9px] font-bold uppercase tracking-[0.15em] text-[#9b897c]">
-                  Actions
-                </p>
-              </div>
-
-              <div className="divide-y divide-[#eee5dc]">
-                {categories.map((category) => (
-                  <div
-                    key={category._id}
-                    className="group flex items-center justify-between gap-3 p-4 transition-colors hover:bg-[#fdfbf9] sm:px-5"
-                  >
-                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-
-                      {/* Category Image */}
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-[#e9e0d7] bg-[#f5eee7] sm:h-16 sm:w-16">
-                        {category.image ? (
-                          <img
-                            src={category.image}
-                            alt={category.name}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[#b7a493]">
-                            <FiImage size={21} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Details */}
-                      <div className="min-w-0">
-                        <h3 className="truncate text-xs font-semibold text-[#33251D] sm:text-sm">
-                          {category.name}
-                        </h3>
-
-                        <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#9b897c] sm:text-[11px]">
-                          {category.description || "No description added"}
-                        </p>
-
-                        <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-[#f5eee7] px-2 py-1 text-[8px] font-semibold uppercase tracking-wider text-[#947761]">
-                          <FiTag size={9} />
-                          Category
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(category)}
-                        title="Edit Category"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f0f5ff] text-blue-600 transition-all hover:bg-blue-600 hover:text-white"
-                      >
-                        <FiEdit size={14} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(category._id)}
-                        disabled={deleting === category._id}
-                        title="Delete Category"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-500 transition-all hover:bg-red-500 hover:text-white disabled:opacity-50"
-                      >
-                        {deleting === category._id ? (
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-200 border-t-red-600" />
-                        ) : (
-                          <FiTrash2 size={14} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        {/* Add / Edit Form */}
-        <aside className="xl:sticky xl:top-24">
-          <form
-            onSubmit={submit}
-            className="overflow-hidden rounded-2xl border border-[#e9e0d7] bg-white shadow-sm"
+          <button
+            type="button"
+            onClick={handleRefresh}
+            aria-label="Refresh list"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink/12 text-ink/60 transition hover:bg-ink/5 hover:text-ink"
           >
+            <FiRefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+        </div>
 
-            {/* Form Header */}
-            <div className="border-b border-[#e9e0d7] bg-[#f8f4ee] px-5 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a1816d]">
-                    Store Collection
-                  </p>
+        <div className="-mx-0.5 mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            const count =
+              f.key === "with" ? withImage : f.key === "without" ? categories.length - withImage : categories.length;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                  active
+                    ? "bg-ink text-white"
+                    : "bg-ink/5 text-ink/60 hover:bg-ink/10 hover:text-ink"
+                }`}
+              >
+                {f.key !== "all" && <FiFilter className="h-2.5 w-2.5" />}
+                {f.label} <span className={active ? "text-white/70" : "text-ink/40"}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-                  <h2 className="mt-1 text-lg font-semibold text-[#33251D]">
-                    {editing ? "Edit Category" : "Add Category"}
-                  </h2>
-
-                  <p className="mt-1 text-[10px] text-[#9b897c]">
-                    {editing
-                      ? "Update your category details."
-                      : "Create a new product collection."}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#80644f] shadow-sm">
-                  {editing ? (
-                    <FiEdit size={19} />
-                  ) : (
-                    <FiPlus size={21} />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-5">
-
-              {/* Name */}
-              <div>
-                <label className={labelClass}>
-                  Category Name <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  required
-                  placeholder="e.g. Skincare"
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm({ ...form, name: e.target.value })
-                  }
-                  className={inputClass}
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className={labelClass}>
-                  Description
-                </label>
-
-                <textarea
-                  rows={3}
-                  placeholder="Write a short category description..."
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                  className={`${inputClass} resize-none`}
-                />
-              </div>
-
-              {/* Image Section */}
-              <div className="border-t border-[#eee5dc] pt-4">
-                <label className={labelClass}>
-                  Category Image
-                </label>
-
-                {/* URL Input */}
-                <div className="relative">
-                  <FiImage
-                    size={15}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#947761]"
-                  />
-
-                  <input
-                    placeholder="Paste image URL..."
-                    value={form.image}
-                    onChange={(e) =>
-                      setForm({ ...form, image: e.target.value })
-                    }
-                    className={`${inputClass} pl-10`}
-                  />
-                </div>
-
-                {/* Upload Divider */}
-                <div className="my-4 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-[#eee5dc]" />
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-[#b4a69b]">
-                    Or Upload Image
-                  </span>
-                  <div className="h-px flex-1 bg-[#eee5dc]" />
-                </div>
-
-                {/* Upload Box */}
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                  />
-
-                  <div
-                    className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-5 text-center transition-all ${
-                      uploading
-                        ? "border-[#d9c9ba] bg-[#faf7f2]"
-                        : "border-[#d9c9ba] bg-[#fdfbf9] hover:border-[#947761] hover:bg-[#f8f4ee]"
-                    }`}
-                  >
-                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f0e7dd] text-[#80644f]">
-                      <FiUploadCloud size={20} />
-                    </div>
-
-                    <p className="text-[11px] font-semibold text-[#594638]">
-                      {uploading
-                        ? "Uploading Image..."
-                        : "Click to upload image"}
-                    </p>
-
-                    <p className="mt-1 text-[9px] text-[#a99a8e]">
-                      Select an image from your computer
-                    </p>
-                  </div>
-                </div>
-
-                {/* Image Preview */}
-                {form.image && (
-                  <div className="mt-4 overflow-hidden rounded-xl border border-[#e9e0d7] bg-[#faf7f2]">
-                    <div className="flex items-center justify-between px-3 py-2">
-                      <span className="text-[10px] font-semibold text-[#594638]">
-                        Image Preview
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            image: "",
-                          }))
-                        }
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-50 text-red-500 transition-colors hover:bg-red-500 hover:text-white"
-                        title="Remove Image"
-                      >
-                        <FiX size={13} />
-                      </button>
-                    </div>
-
-                    <div className="h-36 w-full bg-[#f0e7dd]">
-                      <img
-                        src={form.image}
-                        alt="Category Preview"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
+      {/* ---------- List ---------- */}
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 animate-pulse rounded-xl bg-white ring-1 ring-ink/8" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl bg-white py-14 text-center ring-1 ring-ink/8">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-ink/5 text-ink/40">
+            <FiFolder className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium text-ink">No categories found</p>
+          <p className="mt-1 text-xs text-ink/50">
+            {query || filter !== "all"
+              ? "Try a different search or filter."
+              : "Create your first category to get started."}
+          </p>
+          {(query || filter !== "all") ? (
+            <button
+              onClick={() => { setQuery(""); setFilter("all"); }}
+              className="mt-4 text-xs font-medium text-ink underline-offset-2 hover:underline"
+            >
+              Clear filters
+            </button>
+          ) : (
+            <button
+              onClick={openAdd}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-xs font-medium text-white hover:bg-ink/90"
+            >
+              <FiPlus className="h-3.5 w-3.5" /> Add category
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <ul className="space-y-2 md:hidden">
+            {filtered.map((c) => (
+              <li key={c._id} className="rounded-xl bg-white p-3 ring-1 ring-ink/8">
+                <div className="flex items-start gap-3">
+                  <Thumb src={c.image} name={c.name} size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 text-[13px] font-medium text-ink">{c.name}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-ink/50">
+                          {c.description || "No description added"}
+                        </p>
+                      </div>
+                      <RowMenu
+                        category={c}
+                        onEdit={openEdit}
+                        onDelete={handleDelete}
+                        deleting={deleting === c._id}
                       />
                     </div>
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-ink/5 px-1.5 py-0.5 text-[9px] font-medium text-ink/60">
+                        <FiTag className="h-2.5 w-2.5" /> Category
+                      </span>
+                      {c.image ? (
+                        <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-medium text-green-700">
+                          Has image
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-yellow-50 px-1.5 py-0.5 text-[9px] font-medium text-yellow-700">
+                          No image
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              </li>
+            ))}
+          </ul>
 
-              {/* Buttons */}
-              <div className="border-t border-[#eee5dc] pt-4">
-                <button
-                  type="submit"
-                  disabled={uploading || saving}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#33251D] px-4 py-3.5 text-xs font-semibold text-white shadow-md transition-all hover:bg-[#594333] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving ? (
-                    "Saving Category..."
-                  ) : (
-                    <>
-                      <FiPlus size={16} />
-                      {editing ? "Update Category" : "Create Category"}
-                    </>
-                  )}
-                </button>
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-xl bg-white ring-1 ring-ink/8 md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-ink/[0.03] text-left text-[11px] uppercase tracking-wider text-ink/50">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Category</th>
+                  <th className="px-4 py-2.5 font-medium">Description</th>
+                  <th className="px-4 py-2.5 font-medium">Image</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink/5">
+                {filtered.map((c) => (
+                  <tr key={c._id} className="transition hover:bg-ink/[0.015]">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Thumb src={c.image} name={c.name} />
+                        <span className="line-clamp-1 max-w-[200px] font-medium text-ink">{c.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="line-clamp-1 max-w-[320px] text-ink/60">
+                        {c.description || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {c.image ? (
+                        <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                          Yes
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-yellow-50 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                          None
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end">
+                        <RowMenu
+                          category={c}
+                          onEdit={openEdit}
+                          onDelete={handleDelete}
+                          deleting={deleting === c._id}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
-                {editing && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="mt-3 w-full rounded-xl border border-[#e9e0d7] py-3 text-xs font-semibold text-[#80644f] transition-colors hover:bg-[#faf7f2]"
-                  >
-                    Cancel Editing
-                  </button>
-                )}
-              </div>
-            </div>
-          </form>
-        </aside>
-      </div>
+      {/* ---------- Modal ---------- */}
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        labelledBy="cat-form-title"
+      >
+        <CategoryForm
+          editing={editing}
+          initial={initialForm}
+          onSubmit={handleSubmit}
+          onCancel={closeModal}
+        />
+      </Modal>
     </div>
   );
 };

@@ -1,14 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  FiPlus,
-  FiTrash2,
-  FiTag,
-  FiCalendar,
-  FiPercent,
-  FiShoppingBag,
-  FiClock,
-  FiGift,
-  FiCheckCircle,
+  FiPlus, FiTrash2, FiTag, FiCalendar, FiPercent,
+  FiShoppingBag, FiClock, FiGift, FiCheckCircle,
+  FiSearch, FiRefreshCw, FiX, FiAlertCircle,
+  FiChevronDown,
 } from "react-icons/fi";
 import { adminAPI } from "../../services/adminService";
 
@@ -21,53 +16,316 @@ const INITIAL_FORM = {
   expiryDate: "",
 };
 
+const isExpired = (date) => {
+  if (!date) return false;
+  const expiry = new Date(date);
+  expiry.setHours(23, 59, 59, 999);
+  return expiry < new Date();
+};
+
+const formatDate = (date) => {
+  if (!date) return "No expiry";
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
+};
+
+const statusColor = (expired) =>
+  expired
+    ? "bg-rose-50 text-rose-600 ring-rose-200"
+    : "bg-emerald-50 text-emerald-700 ring-emerald-200";
+
+/* ---------- compact coupon card ---------- */
+const CouponCard = ({ coupon, onDelete, deleting }) => {
+  const expired = isExpired(coupon.expiryDate);
+  const off =
+    coupon.discountType === "percentage"
+      ? `${coupon.discountValue}%`
+      : `₹${coupon.discountValue}`;
+
+  return (
+    <article className="overflow-hidden rounded-xl bg-white ring-1 ring-ink/8 transition active:bg-ink/[0.015]">
+      {/* top strip */}
+      <div className="flex items-center justify-between gap-2 bg-ink/[0.03] px-2.5 py-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <FiTag className="h-3.5 w-3.5 shrink-0 text-ink/40" />
+          <span className="truncate font-mono text-[13px] font-bold tracking-wider text-ink">
+            {coupon.code}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-md bg-ink px-2 py-1 text-[11px] font-bold text-white">
+            {off} OFF
+          </span>
+        </div>
+      </div>
+
+      {/* body */}
+      <div className="px-2.5 py-2">
+        <div className="grid grid-cols-2 gap-2 text-[11px]">
+          <div className="flex items-center gap-1 text-ink/60">
+            <FiShoppingBag className="h-3 w-3 shrink-0 text-ink/40" />
+            Min ₹{Number(coupon.minOrderAmount || 0).toLocaleString("en-IN")}
+          </div>
+          <div className="flex items-center justify-end gap-1 text-ink/60">
+            <FiCalendar className="h-3 w-3 shrink-0 text-ink/40" />
+            {formatDate(coupon.expiryDate)}
+          </div>
+        </div>
+
+        {coupon.maxDiscount > 0 && (
+          <p className="mt-1 text-[10px] text-ink/45">
+            Max discount ₹{Number(coupon.maxDiscount).toLocaleString("en-IN")}
+          </p>
+        )}
+      </div>
+
+      {/* footer */}
+      <div className="flex items-center justify-between gap-2 border-t border-ink/5 px-2.5 py-2">
+        <span
+          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium ring-1 ${statusColor(
+            expired
+          )}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              expired ? "bg-rose-500" : "bg-emerald-500"
+            }`}
+          />
+          {expired ? "Expired" : "Active"}
+        </span>
+
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => onDelete(coupon._id)}
+          className="flex h-7 items-center gap-1 rounded-md bg-rose-50 px-2 text-[10px] font-medium text-rose-600 ring-1 ring-rose-200 transition hover:bg-rose-100 active:scale-95 disabled:opacity-50"
+        >
+          {deleting ? (
+            <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-rose-500 border-r-transparent" />
+          ) : (
+            <FiTrash2 className="h-3 w-3" />
+          )}
+          {deleting ? "Deleting…" : "Delete"}
+        </button>
+      </div>
+    </article>
+  );
+};
+
+/* ---------- coupon form (shared desktop + mobile sheet) ---------- */
+const CouponForm = ({ form, updateField, submit, saving, onClose, showClose }) => {
+  const preview = form.code && form.discountValue;
+  return (
+    <form onSubmit={submit} className="overflow-hidden rounded-xl bg-white ring-1 ring-ink/8">
+      <div className="flex items-center justify-between border-b border-ink/5 bg-ink/[0.03] px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-ink/60 ring-1 ring-ink/8">
+            <FiPlus className="h-3.5 w-3.5" />
+          </div>
+          <h2 className="text-[13px] font-semibold text-ink">Create coupon</h2>
+        </div>
+        {showClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close form"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink/50 hover:bg-ink/5 hover:text-ink"
+          >
+            <FiX className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2.5 p-3">
+        {/* code */}
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-ink/60">
+            Coupon code <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative">
+            <FiTag className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" />
+            <input
+              required
+              placeholder="e.g. WELCOME20"
+              value={form.code}
+              onChange={(e) => updateField("code", e.target.value.toUpperCase())}
+              className="w-full rounded-lg border border-ink/12 bg-white py-1.5 pl-8 pr-2.5 font-mono text-[13px] font-semibold uppercase tracking-wider text-ink placeholder:font-sans placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            />
+          </div>
+        </div>
+
+        {/* type + value */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/60">Type</label>
+            <select
+              value={form.discountType}
+              onChange={(e) => updateField("discountType", e.target.value)}
+              className="w-full cursor-pointer rounded-lg border border-ink/12 bg-white py-1.5 pl-2.5 pr-6 text-[12px] text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            >
+              <option value="percentage">Percent (%)</option>
+              <option value="fixed">Fixed (₹)</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/60">
+              Value <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              {form.discountType === "percentage" ? (
+                <FiPercent className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" />
+              ) : (
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-ink/40">₹</span>
+              )}
+              <input
+                type="number"
+                min="0.01"
+                max={form.discountType === "percentage" ? "100" : undefined}
+                step="any"
+                required
+                placeholder="0"
+                value={form.discountValue}
+                onChange={(e) => updateField("discountValue", e.target.value)}
+                className="w-full rounded-lg border border-ink/12 bg-white py-1.5 pl-8 pr-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* min + max */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/60">Min order</label>
+            <input
+              type="number"
+              min="0"
+              placeholder="0"
+              value={form.minOrderAmount}
+              onChange={(e) => updateField("minOrderAmount", e.target.value)}
+              className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-ink/60">
+              Max discount
+            </label>
+            <input
+              type="number"
+              min="0"
+              placeholder="Optional"
+              value={form.maxDiscount}
+              onChange={(e) => updateField("maxDiscount", e.target.value)}
+              className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            />
+          </div>
+        </div>
+
+        {/* expiry */}
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-ink/60">
+            Expiry date <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative">
+            <FiCalendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/40" />
+            <input
+              type="date"
+              required
+              min={new Date().toLocaleDateString("en-CA")}
+              value={form.expiryDate}
+              onChange={(e) => updateField("expiryDate", e.target.value)}
+              className="w-full rounded-lg border border-ink/12 bg-white py-1.5 pl-8 pr-2.5 text-[13px] text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+            />
+          </div>
+        </div>
+
+        {/* preview */}
+        {preview && (
+          <div className="rounded-lg border border-dashed border-ink/15 bg-ink/[0.02] px-2.5 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-ink/40">
+              Preview
+            </p>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <span className="truncate font-mono text-[12px] font-bold tracking-wider text-ink">
+                {form.code}
+              </span>
+              <span className="shrink-0 rounded-md bg-ink px-2 py-0.5 text-[11px] font-bold text-white">
+                {form.discountType === "percentage"
+                  ? `${form.discountValue}% OFF`
+                  : `₹${form.discountValue} OFF`}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-ink py-2 text-[12px] font-medium text-white transition hover:bg-ink/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-white border-r-transparent" />
+              Creating…
+            </>
+          ) : (
+            <>
+              <FiPlus className="h-3.5 w-3.5" /> Create coupon
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const AdminCoupons = () => {
   const [coupons, setCoupons] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [error, setError] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const load = async () => {
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await adminAPI.getCoupons();
       setCoupons(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Failed to load coupons:", err);
+    } catch {
+      setError("Could not load coupons.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const updateField = (field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setTimeout(() => setRefreshing(false), 400);
   };
+
+  const updateField = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
   const submit = async (e) => {
     e.preventDefault();
-
     if (Number(form.discountValue) <= 0) {
-      alert("Please enter a valid discount value.");
+      setError("Please enter a valid discount value.");
       return;
     }
-
-    if (
-      form.discountType === "percentage" &&
-      Number(form.discountValue) > 100
-    ) {
-      alert("Percentage discount cannot exceed 100%.");
+    if (form.discountType === "percentage" && Number(form.discountValue) > 100) {
+      setError("Percentage discount cannot exceed 100%.");
       return;
     }
-
     setSaving(true);
-
+    setError("");
     try {
       await adminAPI.createCoupon({
         ...form,
@@ -76,504 +334,233 @@ const AdminCoupons = () => {
         minOrderAmount: Number(form.minOrderAmount) || 0,
         maxDiscount: Number(form.maxDiscount) || 0,
       });
-
       setForm(INITIAL_FORM);
-      await load();
-      alert("Coupon created successfully!");
+      setSheetOpen(false);
+      await load(true);
     } catch (err) {
-      console.error("Coupon creation failed:", err);
-      alert(
-        err.response?.data?.message ||
-        "Failed to create coupon. Please try again."
-      );
+      setError(err.response?.data?.message || "Failed to create coupon.");
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this coupon?")) {
-      return;
-    }
-
+    if (!window.confirm("Delete this coupon?")) return;
     try {
       setDeleting(id);
       await adminAPI.deleteCoupon(id);
-      await load();
-    } catch (err) {
-      console.error("Coupon deletion failed:", err);
-      alert("Failed to delete coupon.");
+      setCoupons((list) => list.filter((c) => c._id !== id));
+    } catch {
+      setError("Failed to delete coupon.");
+      await load(true);
     } finally {
       setDeleting(null);
     }
   };
 
-  const isExpired = (date) => {
-    if (!date) return false;
+  const activeCount = coupons.filter((c) => !isExpired(c.expiryDate)).length;
+  const expiredCount = coupons.length - activeCount;
 
-    const expiry = new Date(date);
-    expiry.setHours(23, 59, 59, 999);
-
-    return expiry < new Date();
-  };
-
-  const formatDate = (date) => {
-    if (!date) return "No expiry";
-
-    return new Date(date).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return coupons.filter((c) => {
+      const mq = !q || c.code?.toLowerCase().includes(q);
+      const expired = isExpired(c.expiryDate);
+      const mf =
+        filter === "all" ||
+        (filter === "active" && !expired) ||
+        (filter === "expired" && expired);
+      return mq && mf;
     });
-  };
+  }, [coupons, query, filter]);
 
-  const activeCoupons = coupons.filter((c) => !isExpired(c.expiryDate));
-  const expiredCoupons = coupons.length - activeCoupons.length;
+  const countFor = (key) =>
+    key === "all" ? coupons.length : key === "active" ? activeCount : expiredCount;
+
+  const FILTERS = [
+    { key: "all", label: "All" },
+    { key: "active", label: "Active" },
+    { key: "expired", label: "Expired" },
+  ];
 
   return (
-    <div className="min-h-screen space-y-7 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-[#a1816d]">
-            <FiGift size={13} />
-            Marketing Management
-          </div>
-
-          <h1 className="text-2xl font-semibold tracking-tight text-[#33251D] sm:text-3xl">
-            Coupons & Discounts
+    <div className="space-y-3 pb-24 md:pb-6">
+      {/* ---------- Header ---------- */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-serif text-lg font-semibold text-ink sm:text-xl md:text-2xl">
+            Coupons
           </h1>
-
-          <p className="mt-1.5 text-xs text-[#9b897c] sm:text-sm">
-            Create promotional offers and manage discount codes for your customers.
+          <p className="mt-0.5 text-[11px] text-ink/50">
+            {coupons.length} total · {activeCount} active · {expiredCount} expired
           </p>
         </div>
-
-        <div className="flex w-fit items-center gap-3 rounded-xl border border-[#33251D]/10 bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5efe6] text-[#8b705e]">
-            <FiTag size={19} />
-          </div>
-
-          <div>
-            <p className="text-xl font-bold text-[#33251D]">
-              {coupons.length}
-            </p>
-            <p className="text-[10px] text-[#9b897c]">
-              Total Coupons
-            </p>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleRefresh}
+            aria-label="Refresh"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink/12 text-ink/60 transition hover:bg-ink/5 hover:text-ink active:scale-95"
+          >
+            <FiRefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSheetOpen(true)}
+            className="hidden h-8 items-center gap-1 rounded-lg bg-ink px-2.5 text-[11px] font-medium text-white transition hover:bg-ink/90 active:scale-95 md:flex"
+          >
+            <FiPlus className="h-3.5 w-3.5" /> New
+          </button>
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-
-        <div className="rounded-2xl border border-[#33251D]/10 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-medium text-[#9b897c] sm:text-xs">
-              Total Coupons
-            </span>
-            <FiTag size={17} className="text-[#947761]" />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-[#33251D]">
-            {coupons.length}
-          </p>
-          <p className="mt-1 text-[10px] text-[#9b897c]">
-            All created coupons
-          </p>
+      {/* ---------- Sticky search + filter ---------- */}
+      <div className="sticky top-0 z-20 -mx-1 space-y-2 bg-white/90 px-1 py-2 backdrop-blur-md">
+        <div className="relative">
+          <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search coupon code…"
+            className="w-full rounded-lg border border-ink/12 bg-white py-1.5 pl-8 pr-8 font-mono text-[13px] uppercase tracking-wide text-ink placeholder:font-sans placeholder:normal-case placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-ink/40 hover:bg-ink/5 hover:text-ink"
+            >
+              <FiX className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-[#33251D]/10 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-medium text-[#9b897c] sm:text-xs">
-              Active Coupons
-            </span>
-            <FiCheckCircle size={17} className="text-green-600" />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-[#33251D]">
-            {activeCoupons.length}
-          </p>
-          <p className="mt-1 text-[10px] text-green-600">
-            Within expiry date
-          </p>
+        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition active:scale-95 ${
+                  active
+                    ? "bg-ink text-white"
+                    : "bg-ink/5 text-ink/60 hover:bg-ink/10 hover:text-ink"
+                }`}
+              >
+                {f.label}
+                <span className={`text-[10px] ${active ? "text-white/70" : "text-ink/40"}`}>
+                  {countFor(f.key)}
+                </span>
+              </button>
+            );
+          })}
         </div>
-
-        <div className="col-span-2 rounded-2xl border border-[#33251D]/10 bg-white p-4 shadow-sm lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-medium text-[#9b897c] sm:text-xs">
-              Expired Coupons
-            </span>
-            <FiClock size={17} className="text-red-500" />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-[#33251D]">
-            {expiredCoupons}
-          </p>
-          <p className="mt-1 text-[10px] text-red-500">
-            Past expiry date
-          </p>
-        </div>
-
       </div>
 
-      {/* Main Layout */}
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_360px]">
+      {/* ---------- Error ---------- */}
+      {error && (
+        <p role="alert" className="flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-600 ring-1 ring-rose-100">
+          <FiAlertCircle className="h-3 w-3 shrink-0" /> {error}
+        </p>
+      )}
 
-        {/* Coupon List */}
+      {/* ---------- Layout: list + form ---------- */}
+      <div className="grid items-start gap-3 xl:grid-cols-[1fr_320px]">
+        {/* List */}
         <section className="min-w-0">
-
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[#33251D]">
-                Available Coupons
-              </h2>
-              <p className="mt-1 text-[11px] text-[#9b897c]">
-                Manage all your discount codes
-              </p>
-            </div>
-
-            <span className="rounded-full bg-[#f0e8df] px-3 py-1.5 text-[10px] font-semibold text-[#795e4c]">
-              {coupons.length} Offers
-            </span>
-          </div>
-
           {loading ? (
-            <div className="flex min-h-[250px] items-center justify-center rounded-2xl border border-[#33251D]/10 bg-white">
-              <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#33251D]/15 border-t-[#80644f]" />
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-[140px] animate-pulse rounded-xl bg-white ring-1 ring-ink/8" />
+              ))}
             </div>
-          ) : coupons.length === 0 ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#33251D]/15 bg-white p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5efe6] text-[#947761]">
-                <FiTag size={27} />
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl bg-white py-12 text-center ring-1 ring-ink/8">
+              <div className="mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink/40">
+                <FiGift className="h-4 w-4" />
               </div>
-
-              <h3 className="text-base font-semibold text-[#33251D]">
-                No Coupons Yet
-              </h3>
-
-              <p className="mt-2 max-w-xs text-xs leading-5 text-[#9b897c]">
-                Create your first discount coupon to start offering special deals.
+              <p className="text-[13px] font-medium text-ink">
+                {query || filter !== "all" ? "No matching coupons" : "No coupons yet"}
               </p>
+              <p className="mt-1 text-[11px] text-ink/50">
+                {query || filter !== "all"
+                  ? "Try a different code or filter."
+                  : "Create your first coupon to get started."}
+              </p>
+              {(query || filter !== "all") && (
+                <button
+                  onClick={() => { setQuery(""); setFilter("all"); }}
+                  className="mt-3 text-[11px] font-medium text-ink underline-offset-2 hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-              {coupons.map((coupon) => {
-                const expired = isExpired(coupon.expiryDate);
-
-                return (
-                  <article
-                    key={coupon._id}
-                    className="group relative overflow-hidden rounded-2xl border border-[#33251D]/10 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-                  >
-                    {/* Coupon Top */}
-                    <div className="relative overflow-hidden bg-[#f5efe6] p-5">
-                      <div className="absolute -right-5 -top-8 h-28 w-28 rounded-full border-[16px] border-white/30" />
-                      <div className="absolute -bottom-12 right-16 h-24 w-24 rounded-full border-[12px] border-white/20" />
-
-                      <div className="relative flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[#947761]">
-                            <FiTag size={11} />
-                            Mehrwan Special Offer
-                          </div>
-
-                          <h3 className="break-all text-xl font-bold tracking-wider text-[#33251D]">
-                            {coupon.code}
-                          </h3>
-
-                          <p className="mt-1 text-[10px] text-[#8e7b6d]">
-                            Discount Coupon
-                          </p>
-                        </div>
-
-                        <div className="shrink-0 rounded-xl bg-[#33251D] px-3 py-2.5 text-center text-white shadow-sm">
-                          <p className="text-xl font-bold leading-none">
-                            {coupon.discountType === "percentage"
-                              ? `${coupon.discountValue}%`
-                              : `₹${coupon.discountValue}`}
-                          </p>
-                          <p className="mt-1 text-[8px] font-semibold uppercase tracking-wider text-white/70">
-                            OFF
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Dashed Divider */}
-                    <div className="relative flex items-center">
-                      <div className="-ml-3 h-6 w-6 rounded-full border border-[#33251D]/10 bg-[#faf7f2]" />
-                      <div className="mx-1 flex-1 border-t border-dashed border-[#33251D]/20" />
-                      <div className="-mr-3 h-6 w-6 rounded-full border border-[#33251D]/10 bg-[#faf7f2]" />
-                    </div>
-
-                    {/* Coupon Details */}
-                    <div className="p-4">
-                      <div className="grid grid-cols-2 gap-3">
-
-                        <div className="rounded-xl bg-[#faf7f2] p-3">
-                          <div className="flex items-center gap-1.5 text-[9px] text-[#9b897c]">
-                            <FiShoppingBag size={11} />
-                            Minimum Order
-                          </div>
-                          <p className="mt-1.5 text-sm font-bold text-[#33251D]">
-                            ₹{Number(coupon.minOrderAmount || 0).toLocaleString("en-IN")}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl bg-[#faf7f2] p-3">
-                          <div className="flex items-center gap-1.5 text-[9px] text-[#9b897c]">
-                            <FiCalendar size={11} />
-                            Valid Until
-                          </div>
-                          <p className="mt-1.5 text-xs font-bold text-[#33251D]">
-                            {formatDate(coupon.expiryDate)}
-                          </p>
-                        </div>
-
-                      </div>
-
-                      {coupon.maxDiscount > 0 && (
-                        <p className="mt-3 text-[10px] text-[#8e7b6d]">
-                          Maximum discount:{" "}
-                          <span className="font-semibold text-[#33251D]">
-                            ₹{Number(coupon.maxDiscount).toLocaleString("en-IN")}
-                          </span>
-                        </p>
-                      )}
-
-                      <div className="mt-4 flex items-center justify-between border-t border-[#33251D]/10 pt-3">
-                        <span
-                          className={`rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider ${
-                            expired
-                              ? "bg-red-50 text-red-600"
-                              : "bg-green-50 text-green-700"
-                          }`}
-                        >
-                          {expired ? "Expired" : "Active"}
-                        </span>
-
-                        <button
-                          type="button"
-                          disabled={deleting === coupon._id}
-                          onClick={() => remove(coupon._id)}
-                          title="Delete Coupon"
-                          className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-red-50 px-3 text-[10px] font-semibold text-red-500 transition-colors hover:bg-red-500 hover:text-white disabled:opacity-50"
-                        >
-                          <FiTrash2 size={13} />
-                          {deleting === coupon._id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {filtered.map((c) => (
+                <CouponCard
+                  key={c._id}
+                  coupon={c}
+                  onDelete={remove}
+                  deleting={deleting === c._id}
+                />
+              ))}
             </div>
           )}
         </section>
 
-        {/* Create Coupon Form */}
-        <aside className="xl:sticky xl:top-24">
-          <form
-            onSubmit={submit}
-            className="overflow-hidden rounded-2xl border border-[#33251D]/10 bg-white shadow-sm"
-          >
-            {/* Form Header */}
-            <div className="border-b border-[#33251D]/10 bg-[#f8f4ee] px-5 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a1816d]">
-                    Marketing Tools
-                  </p>
-
-                  <h2 className="mt-1 text-lg font-semibold text-[#33251D]">
-                    Create Coupon
-                  </h2>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#80644f] shadow-sm">
-                  <FiPlus size={20} />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-5">
-
-              {/* Coupon Code */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Coupon Code <span className="text-red-500">*</span>
-                </label>
-
-                <div className="relative">
-                  <FiTag
-                    size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[#947761]"
-                  />
-
-                  <input
-                    required
-                    placeholder="e.g. WELCOME20"
-                    value={form.code}
-                    onChange={(e) =>
-                      updateField("code", e.target.value.toUpperCase())
-                    }
-                    className="input-field pl-9 font-semibold uppercase tracking-wider"
-                  />
-                </div>
-              </div>
-
-              {/* Discount Type */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Discount Type
-                </label>
-
-                <select
-                  value={form.discountType}
-                  onChange={(e) => updateField("discountType", e.target.value)}
-                  className="input-field cursor-pointer"
-                >
-                  <option value="percentage">Percentage Discount (%)</option>
-                  <option value="fixed">Fixed Amount (₹)</option>
-                </select>
-              </div>
-
-              {/* Discount Value */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Discount Value <span className="text-red-500">*</span>
-                </label>
-
-                <div className="relative">
-                  {form.discountType === "percentage" ? (
-                    <FiPercent
-                      size={15}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[#947761]"
-                    />
-                  ) : (
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#947761]">
-                      ₹
-                    </span>
-                  )}
-
-                  <input
-                    type="number"
-                    min="0.01"
-                    max={form.discountType === "percentage" ? "100" : undefined}
-                    step="any"
-                    required
-                    placeholder="Enter discount value"
-                    value={form.discountValue}
-                    onChange={(e) => updateField("discountValue", e.target.value)}
-                    className="input-field pl-9"
-                  />
-                </div>
-              </div>
-
-              {/* Minimum Order */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Minimum Order Amount
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 999"
-                  value={form.minOrderAmount}
-                  onChange={(e) => updateField("minOrderAmount", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Maximum Discount */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Maximum Discount
-                  <span className="ml-1 font-normal text-[#9b897c]">
-                    (Optional)
-                  </span>
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 300"
-                  value={form.maxDiscount}
-                  onChange={(e) => updateField("maxDiscount", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Expiry Date */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Expiry Date <span className="text-red-500">*</span>
-                </label>
-
-                <div className="relative">
-                  <FiCalendar
-                    size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[#947761]"
-                  />
-
-                  <input
-                    type="date"
-                    required
-                    min={new Date().toLocaleDateString("en-CA")}
-                    value={form.expiryDate}
-                    onChange={(e) => updateField("expiryDate", e.target.value)}
-                    className="input-field pl-9"
-                  />
-                </div>
-              </div>
-
-              {/* Coupon Preview */}
-              {form.code && form.discountValue && (
-                <div className="rounded-xl border border-dashed border-[#cbb8a7] bg-[#faf7f2] p-3">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-[#9b897c]">
-                    Coupon Preview
-                  </p>
-
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="break-all text-sm font-bold tracking-wider text-[#33251D]">
-                      {form.code}
-                    </span>
-
-                    <span className="shrink-0 rounded-lg bg-[#33251D] px-3 py-1.5 text-xs font-bold text-white">
-                      {form.discountType === "percentage"
-                        ? `${form.discountValue}% OFF`
-                        : `₹${form.discountValue} OFF`}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit */}
-              <div className="border-t border-[#33251D]/10 pt-4">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="btn-primary flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving ? (
-                    "Creating Coupon..."
-                  ) : (
-                    <>
-                      <FiPlus size={16} />
-                      Create Coupon
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </div>
-          </form>
+        {/* Desktop form (aside) */}
+        <aside className="hidden xl:block xl:sticky xl:top-4">
+          <CouponForm
+            form={form}
+            updateField={updateField}
+            submit={submit}
+            saving={saving}
+            showClose={false}
+          />
         </aside>
-
       </div>
+
+      {/* ---------- Mobile: floating action button ---------- */}
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        aria-label="Create coupon"
+        className="fixed bottom-5 right-4 z-30 flex h-12 items-center gap-1.5 rounded-full bg-ink px-4 text-white shadow-lg shadow-ink/20 transition hover:bg-ink/90 active:scale-95 md:hidden"
+      >
+        <FiPlus className="h-4 w-4" />
+        <span className="text-[12px] font-medium">New coupon</span>
+      </button>
+
+      {/* ---------- Mobile: bottom sheet ---------- */}
+      {sheetOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          {/* backdrop */}
+          <div
+            className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+            onClick={() => setSheetOpen(false)}
+          />
+          {/* sheet */}
+          <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex justify-center bg-white pt-2 pb-1">
+              <div className="h-1 w-10 rounded-full bg-ink/15" />
+            </div>
+            <div className="px-2 pb-4">
+              <CouponForm
+                form={form}
+                updateField={updateField}
+                submit={submit}
+                saving={saving}
+                onClose={() => setSheetOpen(false)}
+                showClose
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

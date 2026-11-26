@@ -1,25 +1,304 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiPlus,
-  FiTrash2,
-  FiEdit,
-  FiUploadCloud,
-  FiImage,
-  FiVideo,
-  FiExternalLink,
-  FiX,
-  FiLayers,
+  FiPlus, FiTrash2, FiEdit, FiUploadCloud, FiImage,
+  FiVideo, FiExternalLink, FiX, FiLayers,
+  FiSearch, FiRefreshCw, FiAlertCircle,
+  FiMoreVertical, FiCheck,
 } from "react-icons/fi";
 import { adminAPI } from "../../services/adminService";
 
 const INITIAL_FORM = {
-  title: "",
-  subtitle: "",
-  image: "",
-  videoUrl: "",
-  link: "",
-  type: "hero",
+  title: "", subtitle: "", image: "", videoUrl: "", link: "", type: "hero",
 };
+
+const TYPE_STYLES = {
+  hero: "bg-ink text-white",
+  promotional: "bg-amber-50 text-amber-700 ring-amber-200",
+  collection: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  instagram: "bg-rose-50 text-rose-600 ring-rose-200",
+  announcement: "bg-yellow-50 text-yellow-700 ring-yellow-200",
+  video: "bg-sky-50 text-sky-700 ring-sky-200",
+};
+
+const typeColor = (type) =>
+  TYPE_STYLES[type] || "bg-ink/5 text-ink/60 ring-ink/10";
+
+/* ---------- 3-dot action menu ---------- */
+const RowMenu = ({ banner, onEdit, onDelete, busy }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const onEsc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => !busy && setOpen((v) => !v)}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More actions"
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/90 backdrop-blur-sm transition active:scale-95 disabled:opacity-50 ${
+          open ? "bg-white text-ink shadow-md" : "text-ink/70 hover:bg-white hover:text-ink"
+        }`}
+      >
+        {busy ? (
+          <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-ink/50 border-r-transparent" />
+        ) : (
+          <FiMoreVertical className="h-4 w-4" />
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1 w-40 overflow-hidden rounded-lg border border-ink/10 bg-white py-1 shadow-lg shadow-ink/15"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onEdit(banner); }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-ink/80 transition hover:bg-ink/5"
+          >
+            <FiEdit className="h-3.5 w-3.5" /> Edit banner
+          </button>
+          <div className="my-1 h-px bg-ink/8" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { setOpen(false); onDelete(banner._id); }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-600 transition hover:bg-rose-50"
+          >
+            <FiTrash2 className="h-3.5 w-3.5" /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ---------- compact banner card ---------- */
+const BannerCard = ({ banner, onEdit, onDelete, busy }) => (
+  <article className="overflow-hidden rounded-xl bg-white ring-1 ring-ink/8 transition active:bg-ink/[0.015]">
+    {/* image with overlay actions */}
+    <div className="relative aspect-video bg-ink/5">
+      <img
+        src={banner.image}
+        alt={banner.title || "Banner"}
+        className="h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+
+      {/* type pill top-left */}
+      <span
+        className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ring-1 ${typeColor(
+          banner.type
+        )}`}
+      >
+        {banner.type}
+      </span>
+
+      {/* 3-dot menu top-right */}
+      <div className="absolute right-2 top-2">
+        <RowMenu banner={banner} onEdit={onEdit} onDelete={onDelete} busy={busy} />
+      </div>
+
+      {/* video badge bottom-left */}
+      {banner.videoUrl && (
+        <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+          <FiVideo className="h-2.5 w-2.5" /> Video
+        </span>
+      )}
+    </div>
+
+    {/* body */}
+    <div className="px-2.5 py-2">
+      <p className="truncate text-[12px] font-semibold text-ink">
+        {banner.title || "Untitled Banner"}
+      </p>
+      <p className="mt-0.5 line-clamp-2 text-[10.5px] leading-relaxed text-ink/55">
+        {banner.subtitle || "No subtitle"}
+      </p>
+
+      {banner.link && (
+        <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded bg-ink/[0.04] px-1.5 py-0.5 text-[10px] text-ink/55">
+          <FiExternalLink className="h-2.5 w-2.5 shrink-0" />
+          <span className="truncate max-w-[180px]">{banner.link}</span>
+        </div>
+      )}
+    </div>
+  </article>
+);
+
+/* ---------- shared form (desktop aside + mobile sheet) ---------- */
+const BannerForm = ({ form, updateField, submit, saving, uploading, editingId, resetForm, onClose, showClose, onImageUpload }) => (
+  <form onSubmit={submit} className="overflow-hidden rounded-xl bg-white ring-1 ring-ink/8">
+    <div className="flex items-center justify-between border-b border-ink/5 bg-ink/[0.03] px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-ink/60 ring-1 ring-ink/8">
+          {editingId ? <FiEdit className="h-3.5 w-3.5" /> : <FiPlus className="h-3.5 w-3.5" />}
+        </div>
+        <h2 className="text-[13px] font-semibold text-ink">
+          {editingId ? "Edit banner" : "New banner"}
+        </h2>
+      </div>
+      {showClose && (
+        <button type="button" onClick={onClose} aria-label="Close"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-ink/50 hover:bg-ink/5 hover:text-ink">
+          <FiX className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+
+    <div className="space-y-2.5 p-3">
+      {/* title */}
+      <div>
+        <label className="mb-1 block text-[11px] font-medium text-ink/60">
+          Title <span className="text-rose-500">*</span>
+        </label>
+        <input
+          required
+          placeholder="Banner title"
+          value={form.title}
+          onChange={(e) => updateField("title", e.target.value)}
+          className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+        />
+      </div>
+
+      {/* subtitle */}
+      <div>
+        <label className="mb-1 block text-[11px] font-medium text-ink/60">Subtitle</label>
+        <input
+          placeholder="Short description"
+          value={form.subtitle}
+          onChange={(e) => updateField("subtitle", e.target.value)}
+          className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+        />
+      </div>
+
+      {/* image upload */}
+      <div>
+        <label className="mb-1 block text-[11px] font-medium text-ink/60">
+          Image <span className="text-rose-500">*</span>
+        </label>
+        <input
+          required={!form.image}
+          placeholder="Image URL"
+          value={form.image}
+          onChange={(e) => updateField("image", e.target.value)}
+          className="mb-2 w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+        />
+
+        <div className="relative">
+          <input
+            type="file" accept="image/*" onChange={onImageUpload}
+            disabled={uploading}
+            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+          />
+          <div className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed px-3 py-3 text-center transition ${
+            uploading ? "border-ink/20 bg-ink/5" : "border-ink/15 bg-ink/[0.02] hover:border-ink/30 hover:bg-ink/5"
+          }`}>
+            <FiUploadCloud className="mb-1 h-4 w-4 text-ink/40" />
+            <p className="text-[11px] font-medium text-ink/60">
+              {uploading ? "Uploading…" : "Tap to upload"}
+            </p>
+          </div>
+        </div>
+
+        {form.image && (
+          <div className="relative mt-2 overflow-hidden rounded-lg ring-1 ring-ink/8">
+            <div className="aspect-video">
+              <img src={form.image} alt="Preview" className="h-full w-full object-cover" />
+            </div>
+            <button
+              type="button"
+              onClick={() => updateField("image", "")}
+              className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-rose-500 shadow-md transition hover:bg-rose-500 hover:text-white"
+            >
+              <FiX className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* video + link — 2 cols */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-ink/60">Video URL</label>
+          <input
+            placeholder="Optional"
+            value={form.videoUrl}
+            onChange={(e) => updateField("videoUrl", e.target.value)}
+            className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[12px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-ink/60">Link</label>
+          <input
+            placeholder="/products"
+            value={form.link}
+            onChange={(e) => updateField("link", e.target.value)}
+            className="w-full rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[12px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+          />
+        </div>
+      </div>
+
+      {/* type */}
+      <div>
+        <label className="mb-1 block text-[11px] font-medium text-ink/60">Type</label>
+        <select
+          value={form.type}
+          onChange={(e) => updateField("type", e.target.value)}
+          className="w-full cursor-pointer rounded-lg border border-ink/12 bg-white py-1.5 px-2.5 text-[12px] text-ink outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10"
+        >
+          <option value="hero">Hero</option>
+          <option value="promotional">Promotional</option>
+          <option value="collection">Collection</option>
+          <option value="instagram">Instagram</option>
+          <option value="announcement">Announcement</option>
+          <option value="video">Video</option>
+        </select>
+      </div>
+
+      {/* actions */}
+      <div className="flex gap-2 border-t border-ink/5 pt-2.5">
+        <button
+          type="submit"
+          disabled={saving || uploading}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-ink py-2 text-[12px] font-medium text-white transition hover:bg-ink/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? (
+            <><span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-white border-r-transparent" /> Saving…</>
+          ) : editingId ? (
+            <><FiCheck className="h-3.5 w-3.5" /> Update</>
+          ) : (
+            <><FiPlus className="h-3.5 w-3.5" /> Create</>
+          )}
+        </button>
+        {editingId && (
+          <button
+            type="button"
+            onClick={resetForm}
+            className="flex items-center justify-center gap-1 rounded-lg border border-ink/15 px-3 text-[11px] font-medium text-ink/60 transition hover:bg-ink/5"
+          >
+            <FiX className="h-3 w-3" /> Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  </form>
+);
 
 const AdminBanners = () => {
   const [banners, setBanners] = useState([]);
@@ -27,60 +306,53 @@ const AdminBanners = () => {
   const [editingId, setEditingId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [processing, setProcessing] = useState(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [error, setError] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const load = async () => {
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await adminAPI.getAllBanners();
       setBanners(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Banner fetch failed:", err);
+    } catch {
+      setError("Could not load banners.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setTimeout(() => setRefreshing(false), 400);
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image.");
+      setError("Please select a valid image.");
       e.target.value = "";
       return;
     }
-
     const formData = new FormData();
     formData.append("images", file);
-
     setUploading(true);
-
+    setError("");
     try {
       const res = await adminAPI.uploadImages(formData);
       const imageUrl = res.data.images?.[0];
-
-      if (!imageUrl) {
-        throw new Error("Cloudinary image URL not received.");
-      }
-
-      setForm((prev) => ({
-        ...prev,
-        image: imageUrl,
-      }));
-
-      alert("Image uploaded successfully!");
+      if (!imageUrl) throw new Error("No URL returned");
+      setForm((prev) => ({ ...prev, image: imageUrl }));
     } catch (err) {
-      console.error(
-        "Cloudinary Upload Failed:",
-        err.response?.data || err
-      );
-
-      alert(
-        err.response?.data?.message ||
-        "Image upload failed. Please try again."
-      );
+      setError(err.response?.data?.message || "Image upload failed.");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -89,33 +361,24 @@ const AdminBanners = () => {
 
   const submit = async (e) => {
     e.preventDefault();
-
     if (!form.image.trim()) {
-      alert("Please upload a banner image or enter an image URL.");
+      setError("Please upload an image or enter a URL.");
       return;
     }
-
     setSaving(true);
-
+    setError("");
     try {
       if (editingId) {
         await adminAPI.updateBanner(editingId, form);
-        alert("Banner updated successfully!");
       } else {
         await adminAPI.createBanner(form);
-        alert("Banner created successfully!");
       }
-
       setForm(INITIAL_FORM);
       setEditingId(null);
-      await load();
+      setSheetOpen(false);
+      await load(true);
     } catch (err) {
-      console.error("Banner save failed:", err);
-
-      alert(
-        err.response?.data?.message ||
-        "Failed to save banner. Please try again."
-      );
+      setError(err.response?.data?.message || "Failed to save banner.");
     } finally {
       setSaving(false);
     }
@@ -130,13 +393,8 @@ const AdminBanners = () => {
       link: banner.link || "",
       type: banner.type || "hero",
     });
-
     setEditingId(banner._id);
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    setSheetOpen(true);
   };
 
   const resetForm = () => {
@@ -145,415 +403,173 @@ const AdminBanners = () => {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this banner?")) {
-      return;
-    }
-
+    if (!window.confirm("Delete this banner?")) return;
+    setProcessing(id);
     try {
       await adminAPI.deleteBanner(id);
-      await load();
-      alert("Banner deleted successfully!");
-    } catch (err) {
-      console.error("Banner delete failed:", err);
-      alert("Failed to delete banner.");
+      setBanners((list) => list.filter((b) => b._id !== id));
+    } catch {
+      setError("Failed to delete banner.");
+      await load(true);
+    } finally {
+      setProcessing(null);
     }
   };
 
-  const updateField = (field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  const updateField = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
 
-  const getTypeStyle = (type) => {
-    const styles = {
-      hero: "bg-[#33251D] text-white",
-      promotional: "bg-[#f4e3d5] text-[#895b43]",
-      collection: "bg-[#e8eee5] text-[#526b4e]",
-      instagram: "bg-[#f4e6ed] text-[#a34e72]",
-      announcement: "bg-[#f8efd7] text-[#95702b]",
-      video: "bg-[#e7eafa] text-[#5363a0]",
-    };
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return banners.filter((b) => {
+      const mq = !q || b.title?.toLowerCase().includes(q) || b.subtitle?.toLowerCase().includes(q);
+      const mf = filter === "all" || b.type === filter;
+      return mq && mf;
+    });
+  }, [banners, query, filter]);
 
-    return styles[type] || "bg-gray-100 text-gray-600";
-  };
+  const TYPES = ["hero", "promotional", "collection", "instagram", "announcement", "video"];
+  const FILTERS = [
+    { key: "all", label: "All" },
+    ...TYPES.filter((t) => banners.some((b) => b.type === t)).map((t) => ({ key: t, label: t })),
+  ];
+
+  const countFor = (key) =>
+    key === "all" ? banners.length : banners.filter((b) => b.type === key).length;
 
   return (
-    <div className="min-h-screen space-y-7 pb-10">
-
-      {/* Header */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-[#a1816d]">
-            <FiLayers size={13} />
-            Store Management
-          </div>
-
-          <h1 className="text-2xl font-semibold tracking-tight text-[#33251D] sm:text-3xl">
-            Banners & Videos
-          </h1>
-
-          <p className="mt-1.5 text-xs text-[#9b897c] sm:text-sm">
-            Manage your homepage banners, promotional images and videos.
+    <div className="space-y-3 pb-24 md:pb-6">
+      {/* header */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-serif text-lg font-semibold text-ink sm:text-xl md:text-2xl">Banners</h1>
+          <p className="mt-0.5 text-[11px] text-ink/50">
+            {banners.length} total · {filtered.length} showing
           </p>
         </div>
-
-        <div className="flex w-fit items-center gap-3 rounded-xl border border-[#33251D]/10 bg-white px-4 py-3 shadow-sm">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f5efe6] text-[#8b705e]">
-            <FiImage size={19} />
-          </div>
-
-          <div>
-            <p className="text-xl font-bold text-[#33251D]">
-              {banners.length}
-            </p>
-            <p className="text-[10px] text-[#9b897c]">
-              Total Banners
-            </p>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleRefresh} aria-label="Refresh"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink/12 text-ink/60 transition hover:bg-ink/5 hover:text-ink active:scale-95">
+            <FiRefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button type="button" onClick={() => { resetForm(); setSheetOpen(true); }}
+            className="hidden h-8 items-center gap-1 rounded-lg bg-ink px-2.5 text-[11px] font-medium text-white transition hover:bg-ink/90 active:scale-95 md:flex">
+            <FiPlus className="h-3.5 w-3.5" /> New
+          </button>
         </div>
       </div>
 
-      {/* Main Layout */}
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_380px]">
+      {/* sticky search + filter */}
+      <div className="sticky top-0 z-20 -mx-1 space-y-2 bg-white/90 px-1 py-2 backdrop-blur-md">
+        <div className="relative">
+          <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink/35" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search title or subtitle…"
+            className="w-full rounded-lg border border-ink/12 bg-white py-1.5 pl-8 pr-8 text-[13px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/10" />
+          {query && (
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-ink/40 hover:bg-ink/5 hover:text-ink">
+              <FiX className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            return (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition active:scale-95 ${
+                  active ? "bg-ink text-white" : "bg-ink/5 text-ink/60 hover:bg-ink/10 hover:text-ink"
+                }`}>
+                {f.label}
+                <span className={`text-[10px] ${active ? "text-white/70" : "text-ink/40"}`}>
+                  {countFor(f.key)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        {/* Banner Collection */}
+      {/* error */}
+      {error && (
+        <p role="alert" className="flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-600 ring-1 ring-rose-100">
+          <FiAlertCircle className="h-3 w-3 shrink-0" /> {error}
+        </p>
+      )}
+
+      {/* layout */}
+      <div className="grid items-start gap-3 xl:grid-cols-[1fr_320px]">
         <section className="min-w-0">
-
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[#33251D]">
-                Your Banners
-              </h2>
-              <p className="mt-1 text-[11px] text-[#9b897c]">
-                All your uploaded promotional content
-              </p>
+          {loading ? (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-[180px] animate-pulse rounded-xl bg-white ring-1 ring-ink/8" />
+              ))}
             </div>
-
-            <span className="rounded-full bg-[#f0e8df] px-3 py-1.5 text-[10px] font-semibold text-[#795e4c]">
-              {banners.length} Items
-            </span>
-          </div>
-
-          {banners.length === 0 ? (
-            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#33251D]/15 bg-white p-8 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5efe6] text-[#947761]">
-                <FiImage size={27} />
+          ) : filtered.length === 0 ? (
+            <div className="rounded-xl bg-white py-12 text-center ring-1 ring-ink/8">
+              <div className="mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink/40">
+                <FiImage className="h-4 w-4" />
               </div>
-
-              <h3 className="text-base font-semibold text-[#33251D]">
-                No banners yet
-              </h3>
-
-              <p className="mt-2 max-w-xs text-xs leading-5 text-[#9b897c]">
-                Start by adding your first banner or promotional image using
-                the form.
+              <p className="text-[13px] font-medium text-ink">
+                {query || filter !== "all" ? "No matching banners" : "No banners yet"}
               </p>
+              <p className="mt-1 text-[11px] text-ink/50">
+                {query || filter !== "all" ? "Try a different search or filter." : "Create your first banner to get started."}
+              </p>
+              {(query || filter !== "all") && (
+                <button onClick={() => { setQuery(""); setFilter("all"); }}
+                  className="mt-3 text-[11px] font-medium text-ink underline-offset-2 hover:underline">
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-              {banners.map((banner) => (
-                <article
-                  key={banner._id}
-                  className="group overflow-hidden rounded-2xl border border-[#33251D]/10 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-                >
-                  {/* Image */}
-                  <div className="relative aspect-[16/9] overflow-hidden bg-[#f5efe6]">
-                    <img
-                      src={banner.image}
-                      alt={banner.title || "Banner"}
-                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-                    <span
-                      className={`absolute left-3 top-3 rounded-full px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider shadow-sm ${getTypeStyle(
-                        banner.type
-                      )}`}
-                    >
-                      {banner.type}
-                    </span>
-
-                    {banner.videoUrl && (
-                      <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-medium text-white backdrop-blur-md">
-                        <FiVideo size={12} />
-                        Video Available
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Details */}
-                  <div className="p-4">
-                    <div className="mb-4 min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-[#33251D]">
-                        {banner.title || "Untitled Banner"}
-                      </h3>
-
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#9b897c]">
-                        {banner.subtitle || "No subtitle added"}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-[#33251D]/10 pt-3">
-                      <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-[#9b897c]">
-                        {banner.link ? (
-                          <>
-                            <FiExternalLink size={12} />
-                            <span className="max-w-[130px] truncate">
-                              {banner.link}
-                            </span>
-                          </>
-                        ) : (
-                          "No redirect link"
-                        )}
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(banner)}
-                          title="Edit Banner"
-                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f1f4fa] text-[#5875a5] transition-colors hover:bg-[#5875a5] hover:text-white"
-                        >
-                          <FiEdit size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => remove(banner._id)}
-                          title="Delete Banner"
-                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff0ef] text-[#cf625a] transition-colors hover:bg-[#cf625a] hover:text-white"
-                        >
-                          <FiTrash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {filtered.map((b) => (
+                <BannerCard key={b._id} banner={b} onEdit={handleEdit} onDelete={remove} busy={processing === b._id} />
               ))}
-
             </div>
           )}
         </section>
 
-        {/* Add / Edit Form */}
-        <aside className="xl:sticky xl:top-24">
-          <form
-            onSubmit={submit}
-            className="overflow-hidden rounded-2xl border border-[#33251D]/10 bg-white shadow-sm"
-          >
-            {/* Form Header */}
-            <div className="border-b border-[#33251D]/10 bg-[#f8f4ee] px-5 py-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a1816d]">
-                    Banner Management
-                  </p>
-
-                  <h2 className="mt-1 text-lg font-semibold text-[#33251D]">
-                    {editingId ? "Edit Banner" : "Create New Banner"}
-                  </h2>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#80644f] shadow-sm">
-                  {editingId ? <FiEdit size={18} /> : <FiPlus size={20} />}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-5">
-
-              {/* Title */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Banner Title <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  required
-                  placeholder="Enter banner title"
-                  value={form.title}
-                  onChange={(e) => updateField("title", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Subtitle */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Subtitle
-                </label>
-
-                <input
-                  placeholder="Enter a short description"
-                  value={form.subtitle}
-                  onChange={(e) => updateField("subtitle", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <label className="mb-2 block text-[11px] font-semibold text-[#5c493b]">
-                  Banner Image <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  required={!form.image}
-                  placeholder="Paste image URL here..."
-                  value={form.image}
-                  onChange={(e) => updateField("image", e.target.value)}
-                  className="input-field mb-3"
-                />
-
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                  />
-
-                  <div
-                    className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors ${
-                      uploading
-                        ? "border-gray-300 bg-gray-50"
-                        : "border-[#cbb8a7] bg-[#faf7f2] hover:border-[#80644f] hover:bg-[#f5efe6]"
-                    }`}
-                  >
-                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#80644f] shadow-sm">
-                      <FiUploadCloud size={20} />
-                    </div>
-
-                    <p className="text-xs font-semibold text-[#5c493b]">
-                      {uploading
-                        ? "Uploading image..."
-                        : "Click to upload image"}
-                    </p>
-
-                    <p className="mt-1 text-[10px] text-[#9b897c]">
-                      Upload directly to Cloudinary
-                    </p>
-                  </div>
-                </div>
-
-                {/* Image Preview */}
-                {form.image && (
-                  <div className="relative mt-3 overflow-hidden rounded-xl border border-[#33251D]/10 bg-[#f5efe6]">
-                    <div className="aspect-[16/8]">
-                      <img
-                        src={form.image}
-                        alt="Banner Preview"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-
-                    <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2.5 py-1 text-[9px] font-medium text-white backdrop-blur-sm">
-                      Image Preview
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => updateField("image", "")}
-                      title="Remove image"
-                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition-colors hover:bg-red-500 hover:text-white"
-                    >
-                      <FiX size={15} />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Video URL */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Video URL <span className="font-normal text-[#9b897c]">(Optional)</span>
-                </label>
-
-                <input
-                  placeholder="Paste video URL"
-                  value={form.videoUrl}
-                  onChange={(e) => updateField("videoUrl", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Redirect Link */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Redirect Link
-                </label>
-
-                <input
-                  placeholder="/products or external URL"
-                  value={form.link}
-                  onChange={(e) => updateField("link", e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              {/* Banner Type */}
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold text-[#5c493b]">
-                  Banner Type
-                </label>
-
-                <select
-                  value={form.type}
-                  onChange={(e) => updateField("type", e.target.value)}
-                  className="input-field cursor-pointer"
-                >
-                  <option value="hero">Hero (Main Homepage)</option>
-                  <option value="promotional">Promotional (Offers)</option>
-                  <option value="collection">Collection</option>
-                  <option value="instagram">Instagram Gallery</option>
-                  <option value="announcement">Announcement Bar</option>
-                  <option value="video">Video Reels</option>
-                </select>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 border-t border-[#33251D]/10 pt-4">
-                <button
-                  disabled={uploading || saving}
-                  type="submit"
-                  className="btn-primary flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {saving ? (
-                    "Saving..."
-                  ) : editingId ? (
-                    <>
-                      <FiEdit size={14} />
-                      Update Banner
-                    </>
-                  ) : (
-                    <>
-                      <FiPlus size={16} />
-                      Create Banner
-                    </>
-                  )}
-                </button>
-
-                {editingId && (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[#33251D]/15 px-4 text-xs font-semibold text-[#665448] transition-colors hover:bg-[#f5efe6]"
-                  >
-                    <FiX size={14} />
-                    Cancel
-                  </button>
-                )}
-              </div>
-
-            </div>
-          </form>
+        {/* desktop form */}
+        <aside className="hidden xl:block xl:sticky xl:top-4">
+          <BannerForm
+            form={form} updateField={updateField} submit={submit}
+            saving={saving} uploading={uploading} editingId={editingId}
+            resetForm={resetForm} showClose={false} onImageUpload={handleImageUpload}
+          />
         </aside>
       </div>
+
+      {/* mobile FAB */}
+      <button type="button" onClick={() => { resetForm(); setSheetOpen(true); }}
+        className="fixed bottom-5 right-4 z-30 flex h-12 items-center gap-1.5 rounded-full bg-ink px-4 text-white shadow-lg shadow-ink/20 transition hover:bg-ink/90 active:scale-95 md:hidden">
+        <FiPlus className="h-4 w-4" />
+        <span className="text-[12px] font-medium">New banner</span>
+      </button>
+
+      {/* mobile bottom sheet */}
+      {sheetOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={() => setSheetOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-2xl bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex justify-center bg-white pt-2 pb-1">
+              <div className="h-1 w-10 rounded-full bg-ink/15" />
+            </div>
+            <div className="px-2 pb-4">
+              <BannerForm
+                form={form} updateField={updateField} submit={submit}
+                saving={saving} uploading={uploading} editingId={editingId}
+                resetForm={resetForm} onClose={() => setSheetOpen(false)}
+                showClose onImageUpload={handleImageUpload}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

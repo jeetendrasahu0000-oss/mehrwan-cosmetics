@@ -1,16 +1,77 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FiUploadCloud, FiTrash2, FiStar, FiPlus } from "react-icons/fi";
+import {
+  FiUploadCloud, FiTrash2, FiStar, FiPlus, FiX,
+  FiChevronDown, FiImage, FiPackage, FiTag, FiLayers,
+  FiInfo, FiCheck, FiAlertCircle, FiArrowLeft,
+} from "react-icons/fi";
 import { adminAPI } from "../../services/adminService";
 import { productAPI } from "../../services/productService";
+
+/* ---------- Section wrapper ---------- */
+const Section = ({ icon: Icon, title, hint, children, right }) => (
+  <section className="rounded-xl bg-white ring-1 ring-ink/8">
+    <header className="flex items-center justify-between gap-2 border-b border-ink/8 px-4 py-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/70">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-ink">{title}</h2>
+          {hint && <p className="truncate text-[11px] text-ink/50">{hint}</p>}
+        </div>
+      </div>
+      {right}
+    </header>
+    <div className="p-4">{children}</div>
+  </section>
+);
+
+/* ---------- Field ---------- */
+const Field = ({ label, name, required, as = "input", options, className = "", ...props }) => {
+  const common =
+    "w-full rounded-lg border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm";
+  return (
+    <div className={className}>
+      <label htmlFor={name} className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink/60">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {as === "textarea" ? (
+        <textarea id={name} name={name} required={required} className={common} {...props} />
+      ) : as === "select" ? (
+        <div className="relative">
+          <select id={name} name={name} required={required} className={`${common} appearance-none pr-8`} {...props}>
+            {options}
+          </select>
+          <FiChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+        </div>
+      ) : (
+        <input id={name} name={name} required={required} className={common} {...props} />
+      )}
+    </div>
+  );
+};
+
+/* ---------- Skeleton ---------- */
+const Skeleton = () => (
+  <div className="mx-auto max-w-4xl space-y-4">
+    <div className="h-7 w-48 animate-pulse rounded bg-ink/10" />
+    {Array.from({ length: 4 }).map((_, i) => (
+      <div key={i} className="h-40 animate-pulse rounded-xl bg-white ring-1 ring-ink/8" />
+    ))}
+  </div>
+);
 
 const EditProduct = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([adminAPI.getAllCategories(), productAPI.getById(id)])
@@ -18,66 +79,74 @@ const EditProduct = () => {
         setCategories(cats.data);
         setForm({
           ...prod.data,
-          images: prod.data.images || [], 
-          variants: prod.data.variants || [], 
+          category: prod.data.category?._id || prod.data.category || "",
+          images: prod.data.images || [],
+          variants: prod.data.variants || [],
         });
       })
-      .catch(() => {});
+      .catch(() => setError("Could not load product."));
   }, [id]);
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  /* ---------- Images ---------- */
   const handleImageUpload = async (e) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) formData.append("images", files[i]);
+    if (!files?.length) return;
+    const fd = new FormData();
+    for (const f of files) fd.append("images", f);
     setUploading(true);
     try {
-      const res = await adminAPI.uploadImages(formData);
-      setForm((prev) => ({ ...prev, images: [...prev.images, ...res.data.images] }));
-    } catch (err) {
-      alert("Image upload failed.");
+      const res = await adminAPI.uploadImages(fd);
+      setForm((p) => ({ ...p, images: [...p.images, ...res.data.images] }));
+    } catch {
+      setError("Image upload failed. Please try again.");
     } finally {
       setUploading(false);
+      e.target.value = "";
     }
   };
 
   const addImageUrl = () => {
     if (!imageUrlInput.trim()) return;
-    setForm((prev) => ({ ...prev, images: [...prev.images, imageUrlInput.trim()] }));
+    setForm((p) => ({ ...p, images: [...p.images, imageUrlInput.trim()] }));
     setImageUrlInput("");
   };
 
-  const removeImage = (indexToRemove) => {
-    setForm((prev) => ({ ...prev, images: prev.images.filter((_, idx) => idx !== indexToRemove) }));
-  };
+  const removeImage = (i) =>
+    setForm((p) => ({ ...p, images: p.images.filter((_, idx) => idx !== i) }));
 
-  const setPrimaryImage = (indexToPromote) => {
-    setForm((f) => {
-      const newImages = [...f.images];
-      const [primary] = newImages.splice(indexToPromote, 1);
-      newImages.unshift(primary);
-      return { ...f, images: newImages };
+  const setPrimaryImage = (i) =>
+    setForm((p) => {
+      const arr = [...p.images];
+      const [primary] = arr.splice(i, 1);
+      arr.unshift(primary);
+      return { ...p, images: arr };
     });
-  };
 
-  const addVariant = () => {
-    setForm({ ...form, variants: [...form.variants, { name: "Size", value: "", priceAdjustment: 0 }] });
-  };
+  /* ---------- Variants ---------- */
+  const addVariant = () =>
+    setForm((p) => ({
+      ...p,
+      variants: [...p.variants, { name: "Size", value: "", priceAdjustment: 0 }],
+    }));
 
-  const updateVariant = (index, field, value) => {
-    const newVariants = [...form.variants];
-    newVariants[index][field] = value;
-    setForm({ ...form, variants: newVariants });
-  };
+  const updateVariant = (i, field, value) =>
+    setForm((p) => {
+      const v = [...p.variants];
+      v[i][field] = value;
+      return { ...p, variants: v };
+    });
 
-  const removeVariant = (index) => {
-    setForm({ ...form, variants: form.variants.filter((_, i) => i !== index) });
-  };
+  const removeVariant = (i) =>
+    setForm((p) => ({ ...p, variants: p.variants.filter((_, idx) => idx !== i) }));
 
+  /* ---------- Submit ---------- */
   const submit = async (e) => {
     e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError("");
     try {
       await adminAPI.updateProduct(id, {
         ...form,
@@ -87,169 +156,269 @@ const EditProduct = () => {
       });
       navigate("/admin/products");
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to update product");
+      setError(err.response?.data?.message || "Failed to update product");
+      setSaving(false);
     }
   };
 
-  if (!form) return <p className="text-ink/50 p-10">Loading…</p>;
+  if (error && !form) {
+    return (
+      <div className="mx-auto max-w-md rounded-xl bg-red-50 p-4 text-sm text-red-600 ring-1 ring-red-100">
+        <FiAlertCircle className="mr-1.5 inline h-4 w-4" /> {error}
+      </div>
+    );
+  }
+
+  if (!form) return <Skeleton />;
 
   return (
-    <div className="max-w-4xl mx-auto pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-serif text-3xl font-semibold">Edit Product</h1>
-        <button onClick={() => navigate("/admin/products")} className="text-sm font-medium text-ink/50 hover:text-ink flex items-center gap-1">
-          Cancel
+    <div className="mx-auto max-w-4xl pb-28 md:pb-6">
+      {/* ---------- Header ---------- */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/products")}
+            aria-label="Back"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink/60 transition hover:bg-ink/5 hover:text-ink"
+          >
+            <FiArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="font-serif text-xl font-semibold text-ink sm:text-2xl md:text-3xl">
+              Edit product
+            </h1>
+            <p className="mt-0.5 truncate text-[11px] text-ink/50 sm:text-sm">
+              {form.name || "Update product details"}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/admin/products")}
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-ink/15 px-2.5 py-1.5 text-xs font-medium text-ink/60 transition hover:border-ink/30 hover:text-ink sm:px-3 sm:py-2"
+        >
+          <FiX className="h-3.5 w-3.5" /> Cancel
         </button>
       </div>
 
-      <form onSubmit={submit} className="bg-white rounded-2xl p-6 md:p-8 space-y-8 shadow-sm border border-ink/5">
-        
-        {/* Basic Info */}
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-ink/50 mb-4 border-b border-ink/5 pb-2">Basic Information</h2>
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Product Name</label>
-              <input name="name" required value={form.name} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">SKU</label>
-              <input name="sku" required value={form.sku} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Brand</label>
-              <input name="brand" required value={form.brand} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Category</label>
-              <select name="category" required value={form.category?._id || form.category} onChange={change} className="input-field">
-                {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-              </select>
-            </div>
+      <form onSubmit={submit} className="space-y-3 sm:space-y-4">
+        {/* ---------- 1. Basic info ---------- */}
+        <Section icon={FiInfo} title="Basic information" hint="Name, brand and category">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Product name" name="name" required value={form.name || ""} onChange={change} />
+            <Field label="SKU" name="sku" required value={form.sku || ""} onChange={change} />
+            <Field label="Brand" name="brand" required value={form.brand || ""} onChange={change} />
+            <Field
+              label="Category" name="category" required as="select"
+              value={form.category} onChange={change}
+              options={
+                <>
+                  <option value="">Select a category</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </>
+              }
+            />
           </div>
-        </div>
+        </Section>
 
-        {/* Pricing & Stock */}
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-ink/50 mb-4 border-b border-ink/5 pb-2">Pricing & Stock</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Price (₹)</label>
-              <input name="price" type="number" required value={form.price} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Discount Price (₹)</label>
-              <input name="discountPrice" type="number" value={form.discountPrice} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Stock Qty</label>
-              <input name="stock" type="number" required value={form.stock} onChange={change} className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Skin Type</label>
-              <select name="skinType" value={form.skinType} onChange={change} className="input-field">
-                {["All", "Oily", "Dry", "Combination", "Sensitive", "Normal"].map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
+        {/* ---------- 2. Pricing & stock ---------- */}
+        <Section icon={FiTag} title="Pricing & stock" hint="Set price and inventory">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Price (₹)" name="price" required type="number" inputMode="numeric" value={form.price ?? ""} onChange={change} />
+            <Field label="Discount (₹)" name="discountPrice" type="number" inputMode="numeric" value={form.discountPrice ?? ""} onChange={change} />
+            <Field label="Stock qty" name="stock" required type="number" inputMode="numeric" value={form.stock ?? ""} onChange={change} />
+            <Field
+              label="Skin type" name="skinType" as="select"
+              value={form.skinType || "All"} onChange={change}
+              options={["All", "Oily", "Dry", "Combination", "Sensitive", "Normal"].map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            />
           </div>
-        </div>
+        </Section>
 
-        {/* Product Details */}
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-ink/50 mb-4 border-b border-ink/5 pb-2">Product Details</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Description</label>
-              <textarea name="description" required rows={3} value={form.description} onChange={change} className="input-field" />
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Ingredients</label>
-                <textarea name="ingredients" rows={2} value={form.ingredients || ""} onChange={change} className="input-field" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-ink/70 mb-1.5 block">Benefits</label>
-                <textarea name="benefits" rows={2} value={form.benefits || ""} onChange={change} className="input-field" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Variants Section */}
-        <div className="border-t border-ink/10 pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-ink/50">Product Variants</h2>
-              <p className="text-xs text-ink/40 mt-1">Default size should have Extra Price 0.</p>
-            </div>
-            <button type="button" onClick={addVariant} className="text-xs font-semibold text-blush-600 hover:text-blush-800 flex items-center gap-1">
-              <FiPlus /> Add Variant
-            </button>
-          </div>
+        {/* ---------- 3. Details ---------- */}
+        <Section icon={FiLayers} title="Product details" hint="Description, ingredients & benefits">
           <div className="space-y-3">
-            {form.variants?.map((variant, index) => (
-              <div key={index} className="flex flex-wrap sm:flex-nowrap gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <input placeholder="Type (Size/Color)" value={variant.name} onChange={(e) => updateVariant(index, 'name', e.target.value)} className="input-field !py-2 text-sm w-full sm:w-1/3" />
-                <input placeholder="Value (50ml/Red)" value={variant.value} onChange={(e) => updateVariant(index, 'value', e.target.value)} className="input-field !py-2 text-sm w-full sm:w-1/3" required />
-                <input type="number" placeholder="Extra Price (₹)" value={variant.priceAdjustment} onChange={(e) => updateVariant(index, 'priceAdjustment', Number(e.target.value))} className="input-field !py-2 text-sm w-full sm:w-1/4" />
-                <button type="button" onClick={() => removeVariant(index)} className="text-red-500 hover:text-red-700 p-2"><FiTrash2 size={18} /></button>
-              </div>
-            ))}
+            <Field label="Description" name="description" required as="textarea" rows={3} value={form.description || ""} onChange={change} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Ingredients" name="ingredients" as="textarea" rows={2} value={form.ingredients || ""} onChange={change} />
+              <Field label="Benefits" name="benefits" as="textarea" rows={2} value={form.benefits || ""} onChange={change} />
+            </div>
           </div>
-        </div>
+        </Section>
 
-        {/* Images */}
-        <div className="border-t border-ink/10 pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-ink/50">Product Images</h2>
-            <span className="text-[10px] text-ink/40">First image is primary</span>
-          </div>
-          <div className="flex flex-wrap gap-4 mb-4">
-            {form.images?.map((img, idx) => (
-              <div key={idx} className="relative w-24 h-28 rounded-xl overflow-hidden border border-ink/10 group bg-gray-50">
-                <img src={img} alt={`Product ${idx}`} className="w-full h-full object-cover" />
-                {idx === 0 ? (
-                  <div className="absolute top-1.5 left-1.5 bg-blush-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                    <FiStar size={10} className="fill-white" /> Primary
+        {/* ---------- 4. Variants ---------- */}
+        <Section
+          icon={FiPackage}
+          title="Variants"
+          hint="Default size should have Extra ₹ = 0"
+          right={
+            <button
+              type="button"
+              onClick={addVariant}
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-ink/5 px-2.5 py-1.5 text-[11px] font-medium text-ink transition hover:bg-ink/10"
+            >
+              <FiPlus className="h-3.5 w-3.5" /> Add
+            </button>
+          }
+        >
+          {form.variants?.length === 0 ? (
+            <p className="py-3 text-center text-xs text-ink/40">
+              No variants. Click <span className="font-medium text-ink/60">Add</span> to create one.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {form.variants.map((v, i) => (
+                <div key={i} className="rounded-lg border border-ink/10 bg-ink/[0.02] p-2.5">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_110px_auto] sm:items-end">
+                    <Field label="Type" value={v.name} onChange={(e) => updateVariant(i, "name", e.target.value)} placeholder="Size" />
+                    <Field label="Value" required value={v.value} onChange={(e) => updateVariant(i, "value", e.target.value)} placeholder="50ml" />
+                    <Field label="Extra ₹" type="number" inputMode="numeric" value={v.priceAdjustment} onChange={(e) => updateVariant(i, "priceAdjustment", Number(e.target.value))} />
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(i)}
+                      aria-label="Remove variant"
+                      className="flex h-10 w-10 items-center justify-center self-end rounded-lg text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                    >
+                      <FiTrash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                ) : (
-                  <button type="button" onClick={() => setPrimaryImage(idx)} className="absolute top-1.5 left-1.5 bg-white/90 text-ink text-[9px] font-bold px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-white">
-                    Set Primary
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* ---------- 5. Images ---------- */}
+        <Section
+          icon={FiImage}
+          title="Images"
+          hint="First image is the primary"
+          right={
+            form.images?.length > 0 && (
+              <span className="rounded-full bg-ink/5 px-2 py-0.5 text-[10px] font-medium text-ink/60">
+                {form.images.length}
+              </span>
+            )
+          }
+        >
+          {form.images?.length > 0 && (
+            <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+              {form.images.map((img, idx) => (
+                <div key={idx} className="group relative aspect-square overflow-hidden rounded-lg border border-ink/10 bg-ink/5">
+                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  {idx === 0 ? (
+                    <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-0.5 text-[8px] font-bold text-white">
+                      <FiStar className="h-2 w-2 fill-white" /> Primary
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPrimaryImage(idx)}
+                      className="absolute inset-x-1 top-1 rounded bg-white/90 py-0.5 text-[9px] font-semibold text-ink opacity-0 shadow-sm transition group-hover:opacity-100"
+                    >
+                      Set primary
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    aria-label="Remove image"
+                    className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-red-500 transition-transform hover:scale-110">
+                      <FiTrash2 className="h-3.5 w-3.5" />
+                    </span>
                   </button>
-                )}
-                <button type="button" onClick={() => removeImage(idx)} className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-8 h-8 bg-white text-red-500 rounded-full flex items-center justify-center hover:scale-110 transition-transform">
-                    <FiTrash2 size={14} />
-                  </div>
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="relative">
-              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={uploading} />
-              <div className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-4 text-sm font-medium transition-colors ${uploading ? "border-gray-300 text-gray-400 bg-gray-50" : "border-ink/20 text-ink/60 hover:border-ink/50 hover:text-ink hover:bg-gray-50"}`}>
-                <FiUploadCloud size={24} />
-                {uploading ? "Uploading..." : "Upload New Images"}
-              </div>
+                </div>
+              ))}
             </div>
-            <div className="flex gap-2">
-              <input placeholder="Paste Image URL..." value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="input-field text-sm" />
-              <button type="button" onClick={addImageUrl} className="btn-outline !py-2 !px-4 text-sm whitespace-nowrap">Add URL</button>
-            </div>
-          </div>
-        </div>
+          )}
 
-        <div className="pt-4 border-t border-ink/5 flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-            <input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} className="w-4 h-4 accent-ink" />
-            Mark as Featured
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label
+              className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-3 text-xs font-medium transition ${
+                uploading
+                  ? "cursor-wait border-ink/10 bg-ink/[0.02] text-ink/40"
+                  : "border-ink/20 text-ink/70 hover:border-ink/40 hover:bg-ink/[0.02]"
+              }`}
+            >
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="sr-only"
+                disabled={uploading}
+              />
+              <FiUploadCloud className="h-4 w-4" />
+              {uploading ? "Uploading…" : "Upload images"}
+            </label>
+
+            <div className="flex gap-2">
+              <input
+                placeholder="Or paste image URL…"
+                value={imageUrlInput}
+                onChange={(e) => setImageUrlInput(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-ink/30 outline-none transition focus:border-ink focus:ring-2 focus:ring-ink/15 sm:text-sm"
+              />
+              <button
+                type="button"
+                onClick={addImageUrl}
+                disabled={!imageUrlInput.trim()}
+                aria-label="Add image URL"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ink text-white transition hover:bg-ink/90 disabled:opacity-40"
+              >
+                <FiPlus className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </Section>
+
+        {/* ---------- Error ---------- */}
+        {error && (
+          <p role="alert" className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 ring-1 ring-red-100">
+            <FiAlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
+          </p>
+        )}
+
+        {/* ---------- Featured + Desktop submit ---------- */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-ink/8">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              checked={!!form.isFeatured}
+              onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+              className="h-4 w-4 accent-ink"
+            />
+            Mark as featured
           </label>
-          <button disabled={uploading} className="btn-primary disabled:opacity-50 min-w-[150px]">
-            {uploading ? "Uploading..." : "Save Changes"}
+
+          <button
+            type="submit"
+            disabled={uploading || saving}
+            className="hidden items-center gap-1.5 rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:opacity-50 md:inline-flex"
+          >
+            {saving ? "Saving…" : <><FiCheck className="h-4 w-4" /> Save changes</>}
           </button>
         </div>
       </form>
+
+      {/* ---------- Mobile sticky footer ---------- */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink/10 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 backdrop-blur md:hidden">
+        <button
+          type="submit"
+          onClick={submit}
+          disabled={uploading || saving}
+          className="w-full rounded-lg bg-ink py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {saving ? "Saving…" : uploading ? "Uploading…" : "Save changes"}
+        </button>
+      </div>
     </div>
   );
 };
